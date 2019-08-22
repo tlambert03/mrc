@@ -8,7 +8,7 @@ __email__ = "talley@hms.harvard.edu"
 __license__ = "BSD license - see LICENSE file"
 __version__ = "0.1.2"
 
-from mrc import (
+from .mrc import (
     bindFile,
     Mrc,
     open,
