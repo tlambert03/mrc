@@ -1,4 +1,7 @@
 language: python
+python:
+- 3.7
+
 deploy:
   provider: pypi
   distributions: sdist bdist_wheel
@@ -6,5 +9,5 @@ deploy:
   password:
     secure: HaLDAjE04wiLj4lR1UrHBikIGUQUgjvj+ASUIUuhAHf0G5R2+VDAgvhINMG4TXB98XZ3M5+qJbE/wjQOqwJbx386jC2hRL6+ZxYkPwUVuDkqn/gyeauM8RKCVtfJ1BX6LfiPsmT/l+9P7zbYvNK8xxLlTbsZWFU/C++BGaW+esZ9IOjNY1Zo5RNZo7rYwg8UcGzJlZPIC11k2BN/PSRVOayjMz4RluK8QzALJjUn/DuZs4CDymLqXENKBnPc0mlSktXFgUaOl6h6clr2ktBzRx6DKLWV/3VhPZDFboGaobRydhNKpLTGeJ12tA/yc/bGO+WTSM4hQY9ikQvNGpkLJPLVP09N5W5c8BmyJRgUaIHX5DWecbCBR1kiNiN1heQHg0YAFDCZ4f0BOnKWkVJTDsTIM4OAGszhj6JCTCJe5MgPMGc3w4TafB9t8gzNEtAlIzTMFR5dm307JGVmpd77u78lzFbauIw26qwZxcD+COZtmKFmWWYTOuxUrknBLsjCQvsW727iF0dCKw+YfZB1E4tDkUjL0y8tuC6jvS0wa9OeDkdZS2fL+Y0WlGn3HB0MAeV9oQkZ7yWOOxGG9pvPFHgkgRYQUm9O9ftJRPFKuvwtd31QKMW6me1pZIjvAr7AMNzIJ+TX+VFmJifKE60BWaYY6rMxdYDOl0vXTBBE7p4=
   on:
-    tags: true
+    branch: master
     repo: talley/mrc
