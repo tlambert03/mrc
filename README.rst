@@ -5,8 +5,8 @@ mrc
 .. image:: https://img.shields.io/pypi/v/mrc.svg
         :target: https://pypi.python.org/pypi/mrc
 
-.. image:: https://img.shields.io/travis/talley/mrc.svg
-        :target: https://travis-ci.org/tlambert03/mrc
+.. image:: https://travis-ci.com/tlambert03/mrc.svg?branch=master
+        :target: https://travis-ci.com/tlambert03/mrc
 
 
 Read and write .mrc and .dv (deltavision) image file format
