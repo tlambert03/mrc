@@ -24,5 +24,5 @@ Credits
 -------
 
 This package was created by Sebastian Haase as a part of the
-Priithon package.  It is mostly just repackaged here and updated
+`priithon <https://github.com/sebhaase/priithon/blob/master/Priithon/Mrc.py>`_ package.  It is mostly just repackaged here and updated
 for python 3.
