@@ -15,12 +15,14 @@ Note, this module is designed to read the MRC variant used by
 deltavision microscopes (.dv). For the MRC file format frequently
 used for structural biology, see https://github.com/ccpem/mrcfile
 
+(thought dv and mrc formats are very similar, dv files have a slightly
+different header, and lack the character string "MAP" in bytes 209-212
+in the `header <http://www.ccpem.ac.uk/mrc_format/mrc2014.php>`_, preventing mrcfile from working).
 
-* Free software: BSD license
 
 Credits
 -------
 
 This package was created by Sebastian Haase as a part of the
 Priithon package.  It is mostly just repackaged here and updated
-to python 3.
+for python 3.
