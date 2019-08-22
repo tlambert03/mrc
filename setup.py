@@ -9,10 +9,9 @@ with open("README.rst") as readme_file:
     readme = readme_file.read()
 
 setup(
-    author="Talley Lambert",
-    author_email="talley.lambert@gmail.com",
+    author="Sebastian Haase",
+    author_email="haase@msg.ucsf.edu",
     classifiers=[
-        "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
         "Natural Language :: English",
