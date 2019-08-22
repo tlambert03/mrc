@@ -1,5 +1,5 @@
 =====
-mrcpy
+mrc
 =====
 
 .. image:: https://img.shields.io/pypi/v/mrc.svg

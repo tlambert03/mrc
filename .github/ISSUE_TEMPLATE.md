@@ -1,4 +1,4 @@
-* mrcpy version:
+* mrc version:
 * Python version:
 * Operating System:
 

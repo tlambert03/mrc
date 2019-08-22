@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""Top-level package for mrcpy."""
+"""Top-level package for mrc.py."""
 
 __author__ = """Sebastian Haase"""
 __maintainer__ = "Talley Lambert"

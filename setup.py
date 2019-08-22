@@ -32,7 +32,7 @@ setup(
     name="mrc",
     packages=find_packages(include=["mrc"]),
     test_suite="tests",
-    url="https://github.com/tlambert03/mrcpy",
+    url="https://github.com/tlambert03/mrc",
     version="0.1.2",
     zip_safe=False,
 )
