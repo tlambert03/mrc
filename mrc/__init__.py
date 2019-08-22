@@ -6,7 +6,7 @@ __author__ = """Sebastian Haase"""
 __maintainer__ = "Talley Lambert"
 __email__ = "talley@hms.harvard.edu"
 __license__ = "BSD license - see LICENSE file"
-__version__ = "0.1.2"
+__version__ = "__version__ = '0.1.3'"
 
 from .mrc import (
     bindFile,
