@@ -15,6 +15,9 @@ Mrc2 class section wise file/array I/O
 """
 
 import numpy as np
+import os
+import weakref
+
 
 try:
     input = raw_input
@@ -38,12 +41,16 @@ def bindFile(fn, writable=0):
 
 
 class Mrc:
-    def __init__(self, path, mode="r", extHdrSize=0, extHdrNints=0, extHdrNfloats=0):
+    def __init__(
+        self, path, mode="r", extHdrSize=0, extHdrNints=0, extHdrNfloats=0, dv=False
+    ):
         """mode can be 'r' or 'r+'
         """
-        import os
 
         self.path = os.path.abspath(path)
+        self.dv = dv
+        if path.endswith(".dv"):
+            self.dv = True
         self.filename = os.path.basename(path)
         self.extension = os.path.splitext(path)[1]
         if extHdrSize and extHdrSize % 1024:
@@ -61,7 +68,7 @@ class Mrc:
             self.isByteSwapped = False
         self.data_offset = 1024 + self.hdr.next
         self.d = self.m[self.data_offset :]
-        self.e = self.m[1024 : self.data_offset]
+        self.e = self.m[1024 : self.data_offset]  # extended header bytes
         self.doDataMap()
         self.numInts = self.hdr.NumIntegers
         self.numFloats = self.hdr.NumFloats
@@ -132,6 +139,7 @@ class Mrc:
         """
         if nz == 0:
             nz = self.hdr.Num[-1]
+        # check to make sure the header isn't shorter than predicted
         maxnz = int(len(self.e) / ((self.numInts + self.numFloats) * 4))
         if nz < 0 or nz > maxnz:
             nz = maxnz
@@ -143,18 +151,55 @@ class Mrc:
         #   shape=nz,
         #   byteorder=byteorder
         # )
-        type_descr = [
-            ("int", "%s%di4" % (byteorder, self.numInts)),
-            ("float", "%s%df4" % (byteorder, self.numFloats)),
-        ]
-        # self.extHdrArray = self.e.view()
-        # self.extHdrArray.__class__ = np.recarray
-        # self.extHdrArray.dtype = type_descr
+
+        _fmt = "%sf4" % (byteorder)
+        dv_floats = []
+        names = (
+            "photosensorReading",
+            "timeStampSeconds",
+            "stageXCoord",
+            "stageYCoord",
+            "stageZCoord",
+            "minInten",
+            "maxInten",
+            "meanInten",
+            "expTime",
+            "ndFilter",
+            "exWavelen",
+            "emWavelen",
+            "intenScaling",
+            "energyConvFactor",
+        )
+        for name in names:
+            dv_floats.append((name, _fmt))
+        for i in range(self.numFloats - len(names)):
+            dv_floats.append(("empty%d" % i, _fmt))
+        dv_floats = np.dtype(dv_floats)
+
+        type_descr = np.dtype(
+            [
+                ("int", "%s%di4" % (byteorder, self.numInts)),
+                (
+                    "float",
+                    dv_floats if self.dv else "%s%df4" % (byteorder, self.numFloats),
+                ),
+            ]
+        )
+
         self.extHdrArray = np.recarray(shape=nz, dtype=type_descr, buf=self.e)
         if self.isByteSwapped:
             self.extHdrArray = self.extHdrArray.newbyteorder()
         self.extInts = self.extHdrArray.field("int")
         self.extFloats = self.extHdrArray.field("float")
+
+    @property
+    def extHdr(self):
+        """ended Header, reshaped to (# timepoints, # wavelengths)
+        for dv files, can index as such:
+          mrc.extHdr['timeStampSeconds'][t, c]
+        where t and c are the timepoint and channel respectively
+        """
+        return np.squeeze(self.extFloats.reshape((-1, self.hdr.NumWaves)))
 
     def doDataMap(self):
         dtype = MrcMode2dtype(self.hdr.PixelType)
@@ -229,7 +274,6 @@ class Mrc:
 
     def data_withMrc(self, fn):
         """use this to get 'spiffed up' array"""
-        import weakref
 
         # NOT-WORKING:  self.data.Mrc = weakref.proxy( self )
         # 20071123: http://www.scipy.org/Subclasses
@@ -274,13 +318,49 @@ def load(fn):
     return a
 
 
+def mmm(a):
+    # calculate (min, max, mean) of array
+    mi = np.min(a)
+    ma = np.max(a)
+    mean = np.mean(a)
+    return np.array([mi, ma, mean], dtype="f")
+
+
+def mm(a):
+    # calculate (min, max) of array
+    mi = np.min(a)
+    ma = np.max(a)
+    return np.array([mi, ma], dtype="f")
+
+
+def calculate_mmm(a, m):
+    # add min/max/mean info to m.hdr
+    wAxis = axisOrderStr(m.hdr).find("w")
+    if wAxis < 0:
+        if a.dtype != np.complex64 and a.dtype != np.complex128:
+            m.hdr.mmm1 = mmm(a)
+        else:
+            m.hdr.mmm1 = mmm(np.abs(a))
+    else:
+        nw = m.hdr.NumWaves
+        m.hdr.mmm1 = mmm(a.take((0,), wAxis))
+        if nw >= 2:
+            m.hdr.mm2 = mm(a.take((1,), wAxis))
+        if nw >= 3:
+            m.hdr.mm3 = mm(a.take((2,), wAxis))
+        if nw >= 4:
+            m.hdr.mm4 = mm(a.take((3,), wAxis))
+        if nw >= 5:
+            m.hdr.mm5 = mm(a.take((4,), wAxis))
+
+
 def save(
     a,
     fn,
     ifExists="overwrite",
     zAxisOrder=None,
     hdr=None,
-    hdrEval="",
+    # hdrEval="",
     calcMMM=True,
     extInts=None,
     extFloats=None,
@@ -304,10 +384,10 @@ def save(
           5D: 'tzw'
     if hdr is not None:  copy all fields(except 'Num',...)
     if calcMMM:  calculate min,max,mean of data set and set hdr field
-    if hdrEval:  exec this string ("hdr" refers to the 'new' header)
     TODO: not implemented yet, extInts=None, extFloats=None
     """
-    import os
+    # removed:
+    # if hdrEval:  exec this string ("hdr" refers to the 'new' header)
 
     if os.path.exists(fn):
         if ifExists[0] == "o":
@@ -322,50 +402,22 @@ def save(
     m.initHdrForArr(a, zAxisOrder)
     if hdr is not None:
         initHdrArrayFrom(m.hdr, hdr)
-    else:  # added by Talley to detect whether array is Mrc format and copy header if so
+    else:
+        # added by Talley to detect whether array is Mrc format and copy header if so
         if hasattr(a, "Mrc"):
             if hasattr(a.Mrc, "hdr"):
                 initHdrArrayFrom(m.hdr, a.Mrc.hdr)
     if calcMMM:
-
-        def mmm(a):
-            mi = np.min(a)
-            ma = np.max(a)
-            mean = np.mean(a)
-            return np.array([mi, ma, mean], dtype="f")
-
-        def mm(a):
-            mi = np.min(a)
-            ma = np.max(a)
-            return np.array([mi, ma], dtype="f")
-
-        wAxis = axisOrderStr(m.hdr).find("w")
-        if wAxis < 0:
-            if a.dtype != np.complex64 and a.dtype != np.complex128:
-                m.hdr.mmm1 = mmm(a)
-            else:
-                m.hdr.mmm1 = mmm(np.abs(a))
-        else:
-            nw = m.hdr.NumWaves
-            m.hdr.mmm1 = mmm(a.take((0,), wAxis))
-            if nw >= 2:
-                m.hdr.mm2 = mm(a.take((1,), wAxis))
-            if nw >= 3:
-                m.hdr.mm3 = mm(a.take((2,), wAxis))
-            if nw >= 4:
-                m.hdr.mm4 = mm(a.take((3,), wAxis))
-            if nw >= 5:
-                m.hdr.mm5 = mm(a.take((4,), wAxis))
+        calculate_mmm(a, m)
     if extInts is not None or extFloats is not None:
         raise NotImplementedError("todo: implement ext hdr")
-    if hdrEval:
-        import sys
-
-        fr = sys._getframe(1)
-        loc = {"hdr": m.hdr}
-        loc.update(fr.f_locals)
-        glo = fr.f_globals
-        exec(hdrEval, globals=glo, locals=loc)
+    # if hdrEval:
+    #     import sys
+    #     fr = sys._getframe(1)
+    #     loc = {"hdr": m.hdr}
+    #     loc.update(fr.f_locals)
+    #     glo = fr.f_globals
+    #     exec(hdrEval, globals=glo, locals=loc)
     m.writeHeader()
     m.writeStack(a)
     m.close()
@@ -432,7 +484,7 @@ class Mrc2:
             'r+'  read-write
             'w'   write - erases old file !!
         """
-        import os
+
         import builtins
 
         self._f = builtins.open(path, mode + "b")
@@ -640,27 +692,22 @@ class Mrc2:
 
 
 ###########################################################################
-###########################################################################
-###########################################################################
-###########################################################################
 def minExtHdrSize(nSecs, bytesPerSec):
     """return smallest multiple of 1024 to fit extHdr data
     """
-    import math
-
-    return int(math.ceil(nSecs * bytesPerSec / 1024.0) * 1024)
+    return int(np.ceil(nSecs * bytesPerSec / 1024.0) * 1024)
 
 
 def MrcMode2dtype(mode):
     PixelTypes = (
         np.uint8,
         np.int16,
-        np.float32,  # 0 1 2
-        np.float32,  # FIXME               # 3
-        np.complex64,  # 4
-        np.int16,  # 5 (IW_EMTOM)
-        np.uint16,  # 6
-        np.int32,  # 7
+        np.float32,
+        np.float32,  # technically "complex32"... which does not exist in numpy
+        np.complex64,
+        np.int16,
+        np.uint16,
+        np.int32,
     )
     if mode < 0 or mode > 7:
         raise Exception("Priism file supports pixeltype 0 to 7 - %d given" % mode)
@@ -780,7 +827,6 @@ def makeHdrArray(buffer=None):
         # 20060131  h.__class__ = np.recarray
         h = buffer
         h.dtype = mrcHdr_dtype
-        import weakref  # 20070131   CHECK if this works
 
         h = weakref.proxy(h)  # 20070131   CHECK if this works
     else:
@@ -961,10 +1007,9 @@ def init_simple(hdr, mode, nxOrShape, ny=None, nz=None):
     hdr.v2 = 0
     hdr.mm5 = (0, 10000)
     hdr.NumTimes = 1
-    hdr.ImgSequence = 0  # Zero => not interleaved. That means z changes
-    # //                           // fastest, then time, then waves;
-    # //                           // 1 => interleaved. That means wave changes fastest,
-    # //                           // then z, then time.
+    hdr.ImgSequence = 0
+    # 0 => not interleaved. That means z changes fastest, then time, then waves;
+    # 1 => interleaved. That means wave changes fastest, then z, then time.
     hdr.tilt = (0, 0, 0)
     hdr.NumWaves = 1
     hdr.wave = (999, 0, 0, 0, 0)
@@ -1072,7 +1117,7 @@ mrcHdrFields = [
     (
         "i2",
         "NumIntegers",
-        "Number of 4 byte integers stored in the extended header per section. ",
+        "Number of 4 byte integers stored in the extended header per section.",
     ),
     (
         "i2",
@@ -1086,10 +1131,10 @@ mrcHdrFields = [
         "Number of sub-resolution data sets stored within "
         "the image. Typically, this equals 1.",
     ),
-    ("i2", "zfac", "Reduction quotient for the z axis of the sub-resolution images. "),
-    ("2f4", "mm2", "(Min, Max) intensity of the 2nd wavelength image. "),
-    ("2f4", "mm3", "(Min, Max) intensity of the 3rd wavelength image. "),
-    ("2f4", "mm4", "(Min, Max) intensity of the 4th wavelength image. "),
+    ("i2", "zfac", "Reduction quotient for the z axis of the sub-resolution images."),
+    ("2f4", "mm2", "(Min, Max) intensity of the 2nd wavelength image."),
+    ("2f4", "mm3", "(Min, Max) intensity of the 3rd wavelength image."),
+    ("2f4", "mm4", "(Min, Max) intensity of the 4th wavelength image."),
     (
         "i2",
         "ImageType",
@@ -1098,9 +1143,9 @@ mrcHdrFields = [
     ("i2", "LensNum", "Lens identification number."),
     ("i2", "n1", "Depends on the image type."),
     ("i2", "n2", "Depends on the image type."),
-    ("i2", "v1", "Depends on the image type. "),
-    ("i2", "v2", "Depends on the image type. "),
-    ("2f4", "mm5", "(Min, Max) intensity of the 5th wavelength image. "),
+    ("i2", "v1", "Depends on the image type."),
+    ("i2", "v2", "Depends on the image type."),
+    ("2f4", "mm5", "(Min, Max) intensity of the 5th wavelength image."),
     ("i2", "NumTimes", "Number of time points."),
     ("i2", "ImgSequence", "Image axis ordering. 0=XYZTW, 1=XYWZT, 2=XYZWT."),
     ("3f4", "tilt", "(x, y, z) axis tilt angle (degrees)."),
@@ -1111,8 +1156,8 @@ mrcHdrFields = [
         "zxy0",
         "(z,x,y) origin, in um.",
     ),  # 20050920  ## fixed: order is z,x,y NOT x,y,z
-    ("i4", "NumTitles", "Number of titles. Valid numbers are between 0 and 10. "),
-    ("10a80", "title", "Title 1. 80 characters long. "),
+    ("i4", "NumTitles", "Number of titles. Valid numbers are between 0 and 10."),
+    ("10a80", "title", "Title 1. 80 characters long."),
 ]
 mrcHdrNames = []
 mrcHdrFormats = []
@@ -1128,8 +1173,6 @@ mrcHdr_dtype = list(zip(mrcHdrNames, mrcHdrFormats))
 
 
 # Tifffile API
-
-
 def imsave(
     file, data, description=None, datetime=None, resolution=None, metadata={}, **kwargs
 ):
