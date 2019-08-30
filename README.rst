@@ -14,17 +14,18 @@ Note, this module is designed to read the MRC variant used by
 deltavision microscopes (.dv). For the MRC file format frequently
 used for structural biology, see https://github.com/ccpem/mrcfile
 
-(thought dv and mrc formats are very similar, dv files have a slightly
-different header, and lack the character string "MAP" in bytes 209-212
-in the `header <http://www.ccpem.ac.uk/mrc_format/mrc2014.php>`_, preventing mrcfile from working).
+(thought dv and mrc formats are very similar, priism/dv files that evolved from the IVE
+library at UCSF have a slightly different header format, preventing mrcfile from working).
 
 
 MRC Header Format
 ~~~~~~~~~~~~~~~~~
 
-*this information is archived from the no-longer-existing page at http://www.msg.ucsf.edu/IVE/IVE4_HTML/priism_mrc_header.html*
+*this information is archived from the no-longer-existing page at
+http://www.msg.ucsf.edu/IVE/IVE4_HTML/priism_mrc_header.html*
 
-The MRC header is 1024 bytes layed out as described below. Each field is in one of these formats:
+The MRC header is 1024 bytes layed out as described below. Each field
+is in one of these formats:
 
 n Is a 2-byte signed integer (NPY_INT16)
 
@@ -36,12 +37,12 @@ cn Is a string of characters that is n bytes long.
 
 .. csv-table::
    :header: Byte Numbers,Variable Type,Variable Name,Contents
-   :widths: 15, 10, 30, 30
+   :widths: 15, 5, 30, 30
 
     1 - 4,i,NumCol,number of columns (fastest-varying dimension; normally mapped to x)
     5 - 8,i,NumRow,number of rows (second fastest-varying dimension; normally mapped to y)
     9 - 12,i,NumSections,"number of sections (slowest-varying dimension; normally mapped to the remaining dimensions, z, wavelength, and time)"
-    13 - 16,i,PixelType,format of each pixel value (the Pixel Data Types section of the Imsubs reference manual lists the defined options)
+    13 - 16,i,PixelType,data type (see `Pixel Data Types`_)
     17 - 20,i,mxst,index of the first column (normally mapped to x) in the data; zero by default
     21 - 24,i,myst,index of the first row (normally mapped to y) in the data; zero by default
     25 - 28,i,mzst,index of the first section (normally treated as the first z) in the data; zero by default
@@ -76,7 +77,7 @@ cn Is a string of characters that is n bytes long.
     149 - 152,f,max3,maximum intensity of the 3rd wavelength image
     153 - 156,f,min4,minimum intensity of the 4th wavelength image
     157 - 160,f,max4,maximum intensity of the 4th wavelength image
-    161 - 162,n,type,image type (the Image Types section of the Imsubs reference manual lists types that have been defined)
+    161 - 162,n,image type, see `Image Types`_
     163 - 164,n,LensNum,lens identification number
     165 - 166,n,n1,depends on the image type
     167 - 168,n,n2,depends on the image type
@@ -109,6 +110,86 @@ cn Is a string of characters that is n bytes long.
     785 - 864,c80,,title 8
     865 - 944,c80,,title 9
     945 - 1024,c80,,title 10
+
+
+
+Pixel Data Types
+~~~~~~~~~~~~~~~~~
+
+The data type used for image pixel values, stored as a signed 32-bit integer
+in bytes 13 through 16, is designated by one of the code numbers in the
+following table.
+
+.. csv-table::
+   :header: Data Type,Numpy Type,Description
+   :widths: 8, 10, 30
+
+    0,NPY_UINT8,1-byte unsigned integer
+    1,NPY_INT16,2-byte signed integer
+    2,NPY_FLOAT32,4-byte floating-point (IEEE)
+    3,,4-byte complex value as 2 2-byte signed integers
+    4,NPY_COMPLEX64,8-byte complex value as 2 4-byte floating-point (IEEE) values
+    5,,2-byte signed integer (unclear)
+    6,NPY_UINT16,2-byte unsigned integer
+    7,NPY_INT32,4-byte signed integer
+
+*Type codes 5, 6, and 7 are not standard MRC types and are not likely to
+be correctly interpreted by other software that uses MRC files.*
+
+
+Image Types
+~~~~~~~~~~~
+
+The type of a Priism image is given by the signed 16-bit integer in header
+bytes 161 and 162. The meaning of these types is given in the table below.
+The floating-point attributes, v1 and v2, used by some image types are stored
+as 16-bit signed integers in the header; to do so the values are multiplied
+by 100 and rounded to the nearest integer when stored and are divided by 100
+when retrieved.
+
+0 (IM_NORMAL_IMAGES)
+    Used for normal image data.
+
+1 (IM_TILT_SERIES)
+    Used for single axis tilt series with a uniform angle increment.
+    n1 specifies the tilt axis (1 for x, 2 for y, 3 for z) and v1 the
+    angle increment in degrees. n2 relates the coordinates in the
+    tilt series to coordinates in a 3D volume: the assumed center of
+    rotation is the z origin from the header plus n2 times one half of
+    the z pixel spacing from the header. v2 is always zero.
+
+2 (IM_STEREO_TILT_SERIES)
+    Used for stereo tilt series. n1 specifies the tilt axis (1 for x,
+    2 for y, 3 for z), v1 the angle increment in degrees, and v2 is
+    the angular separation in degrees for the stereo pairs. n2 is always zero.
+
+3 (IM_AVERAGED_IMAGES)
+    Used for averaged images. n1 is the number of averaged sections and
+    n2 is the number of sections between averaged sections. v1 and v2
+    are always zero.
+
+4 (IM_AVERAGED_STEREO_PAIRS)
+    Used for averaged stereo pairs. n1 is the number of averaged sections,
+    n2 is the number of sections between averaged sections, and v2 is
+    the angular separation in degrees for the stereo pairs. v2 is always zero.
+
+5 (IM_EM_TILT_SERIES)
+    Used for EM tomography data. The tilt angles are stored in the
+    extended header
+    .
+
+20 (IM_MULTIPOSITION)
+    Used for images of well plates. The following quantities are bit-encoded
+    in n1 (valid range for each is show in parentheses): iwell (0-3),
+    ishape (0-1), ibin (0-15), ispeed (0-2), igain (0-3), and mag (0-1).
+    n2 is the number of fields per well. v1 is the fill factor (.01 to 1.5
+    in .01 steps). v2 is not used.
+
+8000 (IM_PUPIL_FUNCTION)
+    Used for images of pupil functions. n1 and n2 are not used. v1 is the
+    numerical aperture times ten. v2 is the immersion media refractive
+    index times one hundred. The pixel spacings and origin have units of
+    cycles per micron rather than microns.
 
 
 Credits

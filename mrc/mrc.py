@@ -46,34 +46,15 @@ class Mrc:
         self.path = os.path.abspath(path)
         self.filename = os.path.basename(path)
         self.extension = os.path.splitext(path)[1]
-        # self.m
-        # self.h
-        # self.hdrArray
-        # self.hdr = self.hdrArray[0].field
-        # self.data_offset = = 1024 + self.hdr.next
-        # self.d
-        # self._nzBeforeByteOrder
-        # self.e  = self.m[1024:self.data_offset]
-        # self.numInts = self.hdr.NumIntegers
-        # self.numFloats = self.hdr.NumFloats
-        # self.extHdrArray
-        # self.extInts   = self.extHdrArray.field('int')
-        # self.extFloats = self.extHdrArray.field('float')
-        # self.data
         if extHdrSize and extHdrSize % 1024:
             raise ValueError(
                 "extended header size needs to be integer multiple of 1024"
             )
-        # 20060818 if not extHdrSize and (extHdrNints or extHdrNfloats):
-        # 20060818     raise "extHdrNints and extHdrNfloats must be 0 if no extHdrSize"
         self.m = np.memmap(path, mode=mode)
         self.h = self.m[:1024]
-        # 20060818 self._hdrArray = makeHdrArray(self.h)
-        # 20060818 self.hdr = implement_hdr( self._hdrArray )
         self.hdr = makeHdrArray(self.h)
         nzBeforeByteOrder = self.hdr.Num[0]
         if nzBeforeByteOrder < 0 or nzBeforeByteOrder > 10000:
-            # newbyteorder()
             self.hdr._array.dtype = self.hdr._array.dtype.newbyteorder()
             self.isByteSwapped = True
         else:
@@ -88,6 +69,19 @@ class Mrc:
             self.doExtHdrMap()
         else:
             self.extHdrArray = None
+
+    # alias
+    @property
+    def header(self):
+        return self.hdr
+
+    @property
+    def shape(self):
+        return self.data.shape
+
+    @property
+    def dtype(self):
+        return self.data.dtype
 
     # this could prevent garbage collector ...
     # http://arctrix.com/nas/python/gc/
@@ -259,75 +253,8 @@ class Mrc:
         data.Mrc = self
         return data
 
-    '''
-    def _newDataType(self, dtype ):
-        """ set size to zero !! flush !
-        self.data changes !!!!"""
-        shape = (0,0,0)
-        self.hdr.Num =shape[2], shape[1], shape[0]
-        self.hdr.PixelType = dtype2MrcMode( dtype )
-        #self.shape = self.hdr.Num[::-1]
-        #self.type = MrcMode2dtype( self.hdr.PixelType )
-        try:
-            self.data.resize( shape )
-        except:
-            self.flush()
-            self.data.resize( shape )
-        self.flush()
-        self.data = np.array(self.d, shape=shape, dtype=dtype, copy=False)
-    def _newDataSizeType(self, shape, type=None ):
-        """if type!=None --> self.data changes !!!!"""
-        #2004/05/18 if len(shape) != 3:
-        #2004/05/18    raise "TODO: shape =! z,y,x -> just ny,nx, or (z2,z1,y,x)"
-        #2004/05/18
-        if len(shape) < 2:
-            raise ValueError, "don't know about data of ndime less than 2"
-        nz = np.prod( shape[:-2] )
-        if type and type != self.data.dtype:
-            self._newDataType( type )
-        try:
-            self.data.resize( shape )
-        except:
-            self.flush()
-            try:
-                self.data.resize( shape )
-            except:
-                raise RuntimeError, "resize failed - tried even calling flush() ... ;-( "
-        #2004/05/18  hhh.setfield('Num', (shape[2], shape[1], shape[0]))
-        self.hdr.Num = shape[-1], shape[-2], nz
-        #2004/05/18  TODO:
-        #          set numtimes and numwaves for higher ndims
-        #          hhh.setfield('PixelType', dtype2MrcMode( type ))
-        #self.shape = self.hdr.Num[::-1]
-        #          self.type = MrcMode2dtype( self.hdr.PixelType )
-        # self.m.flush()
-    def newDataSize(self, shape):
-        #2004/05/18
-        if len(shape) < 2:
-            raise ValueError, "don't know about data of ndime less than 2"
-        #2004/05/18 if len(shape) != 3:
-        #2004/05/18     raise "TODO: shape =! z,y,x -> just ny,nx, or (z2,z1,y,x)"
-        nz = np.prod( shape[:-2] )
-        try:
-            self.data.resize( shape )
-        except:
-            raise RuntimeError, "resize failed - try calling flush()"
-        #2004/05/18  hhh.setfield('Num', (shape[2], shape[1], shape[0]))
-        self.hdr.Num =shape[-1], shape[-2], nz
-        #2004/05/18  TODO:
-        #          set numtimes and numwaves for higher ndims
-        #self.shape = self.hdr.Num[::-1]
-    '''
-
     def close(self):
-        # if self.mode == 'w+':
-        #    self.calcMMM()
         self.m.close()
-
-    #     def sync(self):
-    #         self.m.sync()
-    #     def flush(self):
-    #         self.m.flush()
 
 
 ###########################################################################
@@ -350,7 +277,7 @@ def load(fn):
 def save(
     a,
     fn,
-    ifExists="ask",
+    ifExists="overwrite",
     zAxisOrder=None,
     hdr=None,
     hdrEval="",
@@ -444,9 +371,39 @@ def save(
     m.close()
 
 
-###########################################################################
-###########################################################################
-###########################################################################
+def pick_zAxisOrder(arr):
+    if hasattr(arr, "Mrc"):
+        # if arr.Mrc exists... was likely opened from an existing file
+        # hdr.ImgSequence (0 = ZTW, 1 = WZT, 2 = ZWT)
+        orderlookup = ["wtz", "tzw", "twz"]
+        return orderlookup[arr.Mrc.hdr.ImgSequence]
+
+    shape = arr.shape
+    if arr.ndim == 3:
+        if shape[0] <= 4:
+            # assume this is a multi-channel image, rather than z/t stack
+            return "w"
+        elif shape[0] > 500:
+            # that many planes is unlikely to be a z-stack
+            return "t"
+        return "z"
+
+    argmin = np.argmin(arr.shape)  # probably the wavelength channel
+    if arr.ndim == 4:
+        if shape[argmin] <= 4:
+            if argmin == 0:
+                return "wz"
+            if argmin == 1:
+                return "zw"
+        return "tz"
+
+    if argmin == 0:
+        return "wzt"
+    elif argmin == 1:
+        return "twz"
+    return "tzw"
+
+
 ###########################################################################
 class Mrc2:
     """
@@ -500,38 +457,14 @@ class Mrc2:
             self._secByteSize = 0
 
     def initHdrForArr(self, arr, zAxisOrder=None):
-        """
-        use zAxisOrder if arr.ndim > 3:
-          zAxisOrder is given in order conform to python(last is fastest)
-             (spaces,commas,dots,minuses  are ignored)
-          examples:
-             4D: time,z,y,x          -->  zAxisOrder= 't z'
-             5D: time, wave, z,y,x   -->  zAxisOrder= 't,z,w'
-          refer to Mrc spec 'ImgSequence' (interleaved or not)
-          zAxisOrder None means:
-             3D: 'z'
-             4D: 'tz'
-             5D: 'tzw'
-        """
+
         if zAxisOrder is None:
-            # added by Talley to detect whether array is Mrc format and copy header if so
-            if hasattr(arr, "Mrc"):
-                orderlookup = ["wtz", "tzw", "twz"]
-                zAxisOrder = orderlookup[arr.Mrc.hdr.ImgSequence]
-            else:
-                if arr.ndim == 3:
-                    zAxisOrder = "z"
-                elif arr.ndim == 4:
-                    zAxisOrder = "tz"
-                else:
-                    zAxisOrder = "tzw"
+            zAxisOrder = pick_zAxisOrder(arr)
         else:
-            import string
+            import re
 
             # remove delimiter characters '-., '
-            zAxisOrder = zAxisOrder.translate(
-                string.join([chr(i) for i in range(256)], ""), "-., "
-            ).lower()
+            zAxisOrder = re.sub("[-., ]", "", zAxisOrder)
         mrcmode = dtype2MrcMode(arr.dtype.type)
         init_simple(self.hdr, mrcmode, arr.shape)
         if arr.ndim == 2:
@@ -826,6 +759,13 @@ def implement_hdr(hdrArray):
             # 20070131 return hdrArray.field(n)[0]
             return hdrArray[n][0]
 
+        def __str__(self):
+            out = ""
+            for field in mrcHdrNames:
+                if field != "_array":
+                    out += "{:12}{}\n".format(field, self.__getattr__(field))
+            return out
+
         # depricated !!
         # def __call__(s, n):
         #    return hdrArray.field(n)[0]
@@ -1106,63 +1046,131 @@ def setTitle(hdr, s, i=-1):
 
 
 mrcHdrFields = [
-    ("3i4", "Num"),  # (nx,ny,nSecs), ex: memmap([1024, 1024,   51], dtype=int32)
-    ("1i4", "PixelType"),  # ? ex: 2
-    ("3i4", "mst"),  # ? ex: memmap([0, 0, 0], dtype=int32)
-    ("3i4", "m"),  # ex: memmap([1, 1, 1], dtype=int32)
-    ("3f4", "d"),  # pixel sizes, ex: memmap([ 0.04 ,  0.04 ,  0.125], dtype=float32)
-    ("3f4", "angle"),  # ex:  memmap([ 90.,  90.,  90.], dtype=float32)
-    ("3i4", "axis"),  # ex: memmap([1, 2, 3], dtype=int32)
-    ("3f4", "mmm1"),
-    # min-max channel 1,
-    # ex: memmap([ -4184.10205078, 18190.24023438, 142.72235107], dtype=float32)
-    ("1i2", "type"),
-    ("1i2", "nspg"),
-    ("1i4", "next"),
-    ("1i2", "dvid"),
-    ("30i1", "blank"),
+    ("3i4", "Num", "Number of pixels in (x, y, z) dimensions"),
     (
-        "1i2",
+        "i4",
+        "PixelType",
+        "Data type (0=uint8, 1=int16, 2=float32, 4=complex64, 6=uint16",
+    ),
+    (
+        "3i4",
+        "mst",
+        "Index of the first (col/x, row/y, section/z).  (0,0,0) by default.",
+    ),
+    ("3i4", "m", "Pixel Sampling intervals in the (x,y,z) dimensions. usually (1,1,1)"),
+    ("3f4", "d", "Pixel spacing times sampling interval in (x, y, z) dimensions"),
+    ("3f4", "angle", "Cell angle (alpha, beta, gamma) in degress.  Default (90,90,90)"),
+    ("3i4", "axis", "Axis (colum, row, section).  Defaults to (1, 2, 3)"),
+    ("3f4", "mmm1", "(Min, Max, Mean) of the 1st wavelength image"),
+    ("i2", "type", ""),  # seems to disagree with IVE header byte format/offset
+    ("i2", "nspg", "Space group number (for crystallography)"),
+    ("i4", "next", "Extended header size in bytes."),
+    ("i2", "dvid", "ID value (-16224)"),
+    ("30i1", "blank", "unused"),
+    # seems to disagree with IVE header byte format/offset
+    # or at least "blank" here includes "nblank", "ntst", and "blank"
+    (
+        "i2",
         "NumIntegers",
         "Number of 4 byte integers stored in the extended header per section. ",
     ),
     (
-        "1i2",
+        "i2",
         "NumFloats",
         "Number of 4 byte floating-point numbers stored "
         "in the extended header per section.",
     ),
     (
-        "1i2",
+        "i2",
         "sub",
         "Number of sub-resolution data sets stored within "
         "the image. Typically, this equals 1.",
     ),
-    ("1i2", "zfac", "Reduction quotient for the z axis of the sub-resolution images. "),
-    ("2f4", "mm2", "Minimum intensity of the 2nd wavelength image. "),
-    ("2f4", "mm3", "Minimum intensity of the 2nd wavelength image. "),
-    ("2f4", "mm4", "Minimum intensity of the 2nd wavelength image. "),
-    ("1i2", "ImageType", "Image type. See Image Type table below. "),
-    ("1i2", "LensNum", "Lens identification number."),
-    ("1i2", "n1", "Depends on the image type."),
-    ("1i2", "n2", "Depends on the image type."),
-    ("1i2", "v1", "Depends on the image type. "),
-    ("1i2", "v2", "Depends on the image type. "),
-    ("2f4", "mm5", "Minimum intensity of the 2nd wavelength image. "),
-    ("1i2", "NumTimes", "Number of time points."),
-    ("1i2", "ImgSequence", "Image sequence. 0=ZTW, 1=WZT, 2=ZWT. "),
-    ("3f4", "tilt", "X axis tilt angle (degrees). "),
-    ("1i2", "NumWaves", "Number of wavelengths."),
-    ("5i2", "wave", "Wavelength 1, in nm."),
-    ("3f4", "zxy0", "X origin, in um."),  # 20050920  ## fixed: order is z,x,y NOT x,y,z
-    ("1i4", "NumTitles", "Number of titles. Valid numbers are between 0 and 10. "),
+    ("i2", "zfac", "Reduction quotient for the z axis of the sub-resolution images. "),
+    ("2f4", "mm2", "(Min, Max) intensity of the 2nd wavelength image. "),
+    ("2f4", "mm3", "(Min, Max) intensity of the 3rd wavelength image. "),
+    ("2f4", "mm4", "(Min, Max) intensity of the 4th wavelength image. "),
+    (
+        "i2",
+        "ImageType",
+        "Image type. (Type 0 used for normal imaging, 8000 used for pupil functions)",
+    ),
+    ("i2", "LensNum", "Lens identification number."),
+    ("i2", "n1", "Depends on the image type."),
+    ("i2", "n2", "Depends on the image type."),
+    ("i2", "v1", "Depends on the image type. "),
+    ("i2", "v2", "Depends on the image type. "),
+    ("2f4", "mm5", "(Min, Max) intensity of the 5th wavelength image. "),
+    ("i2", "NumTimes", "Number of time points."),
+    ("i2", "ImgSequence", "Image axis ordering. 0=XYZTW, 1=XYWZT, 2=XYZWT."),
+    ("3f4", "tilt", "(x, y, z) axis tilt angle (degrees)."),
+    ("i2", "NumWaves", "Number of wavelengths."),
+    ("5i2", "wave", "Wavelengths (for channel [0, 1, 2, 3, 4]), in nm."),
+    (
+        "3f4",
+        "zxy0",
+        "(z,x,y) origin, in um.",
+    ),  # 20050920  ## fixed: order is z,x,y NOT x,y,z
+    ("i4", "NumTitles", "Number of titles. Valid numbers are between 0 and 10. "),
     ("10a80", "title", "Title 1. 80 characters long. "),
 ]
 mrcHdrNames = []
 mrcHdrFormats = []
+mrcHdrDescriptions = {}
 for ff in mrcHdrFields:
     mrcHdrFormats.append(ff[0])
     mrcHdrNames.append(ff[1])
+    if len(ff) > 2:
+        mrcHdrDescriptions[ff[1]] = ff[2]
 del ff
 del mrcHdrFields
 mrcHdr_dtype = list(zip(mrcHdrNames, mrcHdrFormats))
+
+
+# Tifffile API
+
+
+def imsave(
+    file, data, description=None, datetime=None, resolution=None, metadata={}, **kwargs
+):
+    """Write numpy array to mrc file
+
+    This is a wrapper on the mrc.save() function, meant to mimic a subset of 
+    the tifffile.imsave API
+        datetime : datetime, str, or bool
+            Date and time of image creation in '%Y:%m:%d %H:%M:%S' format or
+            datetime object. Else if True, the current date and time is used.
+            Saved with the first page only.
+        resolution : (float, float, float), or (float, float)
+            X, Y, (and Z. if ndim==3) resolutions in microns per pixel.
+    """
+    import datetime
+
+    if datetime:
+        if isinstance(datetime, str):
+            if len(datetime) != 19 or datetime[16] != ":":
+                raise ValueError("invalid datetime string")
+        else:
+            try:
+                datetime = datetime.strftime("%Y:%m:%d %H:%M:%S")
+            except AttributeError:
+                datetime = datetime.datetime.now().strftime("%Y:%m:%d %H:%M:%S")
+        addtag("DateTime", "s", 0, datetime, writeonce=True)
+
+    if resolution is not None:
+        addtag("XResolution", "2I", 1, rational(resolution[0]))
+        addtag("YResolution", "2I", 1, rational(resolution[1]))
+        if len(resolution) > 2:
+            unit = resolution[2]
+            unit = 1 if unit is None else enumarg(TIFF.RESUNIT, unit)
+        elif self._imagej:
+            unit = 1
+        else:
+            unit = 2
+        addtag("ResolutionUnit", "H", 1, unit)
+    elif not self._imagej:
+        addtag("XResolution", "2I", 1, (1, 1))
+        addtag("YResolution", "2I", 1, (1, 1))
+        addtag("ResolutionUnit", "H", 1, 1)
+
+    return save(data, file, **kwargs)
