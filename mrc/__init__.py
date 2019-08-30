@@ -18,7 +18,7 @@ from .mrc import (
     shapeFromHdr,
     makeHdrArray,
     hdrInfo,
-    initHdrArrayFrom,
+    copyHdrInfo,
 )
 
 __all__ = [
@@ -31,5 +31,5 @@ __all__ = [
     "shapeFromHdr",
     "makeHdrArray",
     "hdrInfo",
-    "initHdrArrayFrom",
+    "copyHdrInfo",
 ]

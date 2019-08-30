@@ -199,7 +199,9 @@ class Mrc:
           mrc.extHdr['timeStampSeconds'][t, c]
         where t and c are the timepoint and channel respectively
         """
-        return np.squeeze(self.extFloats.reshape((-1, self.hdr.NumWaves)))
+        if hasattr(self, 'extFloats'):
+            return np.squeeze(self.extFloats.reshape((-1, self.hdr.NumWaves)))
+        return None
 
     def doDataMap(self):
         dtype = MrcMode2dtype(self.hdr.PixelType)
@@ -364,6 +366,7 @@ def save(
     calcMMM=True,
     extInts=None,
     extFloats=None,
+    metadata=None,
 ):
     """
     ifExists shoud be one of
@@ -385,6 +388,8 @@ def save(
     if hdr is not None:  copy all fields(except 'Num',...)
     if calcMMM:  calculate min,max,mean of data set and set hdr field
     TODO: not implemented yet, extInts=None, extFloats=None
+
+    metadata (dict): fields to overwrite in the header, accepts all field names in hdr
     """
     # removed:
     # if hdrEval:  exec this string ("hdr" refers to the 'new' header)
@@ -401,14 +406,16 @@ def save(
     m = Mrc2(fn, mode="w")
     m.initHdrForArr(a, zAxisOrder)
     if hdr is not None:
-        initHdrArrayFrom(m.hdr, hdr)
+        copyHdrInfo(m.hdr, hdr)
     else:
         # added by Talley to detect whether array is Mrc format and copy header if so
         if hasattr(a, "Mrc"):
             if hasattr(a.Mrc, "hdr"):
-                initHdrArrayFrom(m.hdr, a.Mrc.hdr)
+                copyHdrInfo(m.hdr, a.Mrc.hdr)
     if calcMMM:
         calculate_mmm(a, m)
+    if metadata is not None:
+        add_metadata(metadata, m.hdr)
     if extInts is not None or extFloats is not None:
         raise NotImplementedError("todo: implement ext hdr")
     # if hdrEval:
@@ -421,6 +428,38 @@ def save(
     m.writeHeader()
     m.writeStack(a)
     m.close()
+
+
+def add_metadata(metadata, hdr):
+    for key, value in metadata.items():
+        if key in ("Num", "PixelType", "NumTimes", "NumWaves"):
+            import warnings
+
+            warnings.warn(
+                "Refusing to override metadata field derived from array: %s" % key
+            )
+            continue
+        if key not in mrcHdrNames:
+            if key == "dx":
+                hdr.d[0] = value
+            elif key == "dy":
+                hdr.d[1] = value
+            elif key == "dz":
+                hdr.d[2] = value
+            elif key == "dxy":
+                hdr.d[:2] = value
+            elif key == "dxyz":
+                hdr.d[:3] = value
+            elif key in ("wave0", "wave1", "wave2", "wave3", "wave4", "wave5"):
+                hdr.wave[int(key[-1])] = value
+            else:
+                raise ValueError(
+                    'Unrecognized header field: "{}"... must be one of {}'.format(
+                        key, ", ".join(mrcHdrNames)
+                    )
+                )
+            continue
+        setattr(hdr, key, value)
 
 
 def pick_zAxisOrder(arr):
@@ -591,15 +630,11 @@ class Mrc2:
         self._secByteSize = np.nbytes[self._dtype] * np.prod(self._shape2d)
 
     def setHdrForShapeType(self, shape, type):
+        # not used by anything at the moment
         mrcmode = dtype2MrcMode(type)
         self.hdr.PixelType = mrcmode
         self.hdr.Num = shape[-1], shape[-2], np.prod(shape[:-2])
         self._initWhenHdrArraySet()
-        #       self._shape = shape
-        #       self._shape2d = self._shape[-2:]
-        #       self._dtype  = type
-        #       self._secByteSize = self._dtype.itemsize * np.prod( self._shape2d )
-        #       #init_simple(self._hdrArray, mrcmode, shape)
 
     def makeExtendedHdr(self, numInts, numFloats, nSecs=None):
         self._extHdrNumInts = self.hdr.NumIntegers = numInts
@@ -731,7 +766,7 @@ def dtype2MrcMode(dtype):
         return 6
     if dtype == np.int32:
         return 7
-    raise TypeError("MRC does not support %s (%s)" % (dtype.name, dtype))
+    raise TypeError("MRC does not support %s (%s)" % (dtype.__name__, dtype))
 
 
 def shapeFromHdr(hdr, verbose=0):
@@ -990,7 +1025,7 @@ def init_simple(hdr, mode, nxOrShape, ny=None, nz=None):
     hdr.type = 0
     hdr.nspg = 0
     hdr.next = 0
-    hdr.dvid = 0xC0A0  # CHECK - should "priithon" get it own ID !?
+    hdr.dvid = -16224
     hdr.blank = 0  # CHECK Hans: add ntst to record time domain offset
     hdr.NumIntegers = 0
     hdr.NumFloats = 0
@@ -1018,59 +1053,14 @@ def init_simple(hdr, mode, nxOrShape, ny=None, nz=None):
     hdr.title = "\0" * 80
 
 
-def initHdrArrayFrom(hdrDest, hdrSrc):  # , mode, nxOrShape, ny=None, nz=None):
+def copyHdrInfo(hdrDest, hdrSrc):
     """copy all field of the header
-       EXCEPT  shape AND PixelType AND all fields related to extended hdr
+    EXCEPT  shape AND PixelType AND all fields related to extended hdr
     """
-    """
-    if ny is nz is None:
-        if len(nxOrShape) == 2:
-            nz,(ny,nx)  = 1, nxOrShape
-        elif len(nxOrShape) == 1:
-            nz,ny,nx  = 1, 1, nxOrShape
-        elif len(nxOrShape) == 3:
-            nz,ny,nx  = nxOrShape
-        else:
-            ny,nx  = nxOrShape[-2:]
-            nz     = np.prod(nxOrShape[:-2])
-    else:
-        nx = nxOrShape
-    """
-    #  hdrDest.PixelType = .hdr.PixelType
-    hdrDest.mst = hdrSrc.mst
-    hdrDest.m = hdrSrc.m
-    hdrDest.d = hdrSrc.d
-    hdrDest.angle = hdrSrc.angle
-    hdrDest.axis = hdrSrc.axis
-    hdrDest.mmm1 = hdrSrc.mmm1
-    hdrDest.type = hdrSrc.type
-    hdrDest.nspg = hdrSrc.nspg
-    #   hdrDest.next =  hdrSrc.next
-    hdrDest.next = 0
-    hdrDest.dvid = hdrSrc.dvid
-    hdrDest.blank = hdrSrc.blank
-    hdrDest.NumIntegers = 0  # hdrSrc.NumIntegers
-    hdrDest.NumFloats = 0  # hdrSrc.NumFloats
-    hdrDest.sub = hdrSrc.sub
-    hdrDest.zfac = hdrSrc.zfac
-    hdrDest.mm2 = hdrSrc.mm2
-    hdrDest.mm3 = hdrSrc.mm3
-    hdrDest.mm4 = hdrSrc.mm4
-    hdrDest.ImageType = hdrSrc.ImageType
-    hdrDest.LensNum = hdrSrc.LensNum
-    hdrDest.n1 = hdrSrc.n1
-    hdrDest.n2 = hdrSrc.n2
-    hdrDest.v1 = hdrSrc.v1
-    hdrDest.v2 = hdrSrc.v2
-    hdrDest.mm5 = hdrSrc.mm5
-    hdrDest.NumTimes = hdrSrc.NumTimes
-    hdrDest.ImgSequence = hdrSrc.ImgSequence
-    hdrDest.tilt = hdrSrc.tilt
-    hdrDest.NumWaves = hdrSrc.NumWaves
-    hdrDest.wave = hdrSrc.wave
-    hdrDest.zxy0 = hdrSrc.zxy0
-    hdrDest.NumTitles = hdrSrc.NumTitles
-    hdrDest.title = hdrSrc.title
+    for field in mrcHdrNames:
+        if field in ("Num", "PixelType", "next"):
+            continue
+        setattr(hdrDest, field, getattr(hdrSrc, field))
 
 
 def setTitle(hdr, s, i=-1):
@@ -1173,47 +1163,21 @@ mrcHdr_dtype = list(zip(mrcHdrNames, mrcHdrFormats))
 
 
 # Tifffile API
-def imsave(
-    file, data, description=None, datetime=None, resolution=None, metadata={}, **kwargs
-):
+def imsave(file, data, resolution=None, metadata={}, **kwargs):
     """Write numpy array to mrc file
 
     This is a wrapper on the mrc.save() function, meant to mimic a subset of 
     the tifffile.imsave API
-        datetime : datetime, str, or bool
-            Date and time of image creation in '%Y:%m:%d %H:%M:%S' format or
-            datetime object. Else if True, the current date and time is used.
-            Saved with the first page only.
         resolution : (float, float, float), or (float, float)
             X, Y, (and Z. if ndim==3) resolutions in microns per pixel.
     """
-    import datetime
-
-    if datetime:
-        if isinstance(datetime, str):
-            if len(datetime) != 19 or datetime[16] != ":":
-                raise ValueError("invalid datetime string")
-        else:
-            try:
-                datetime = datetime.strftime("%Y:%m:%d %H:%M:%S")
-            except AttributeError:
-                datetime = datetime.datetime.now().strftime("%Y:%m:%d %H:%M:%S")
-        addtag("DateTime", "s", 0, datetime, writeonce=True)
-
     if resolution is not None:
-        addtag("XResolution", "2I", 1, rational(resolution[0]))
-        addtag("YResolution", "2I", 1, rational(resolution[1]))
-        if len(resolution) > 2:
-            unit = resolution[2]
-            unit = 1 if unit is None else enumarg(TIFF.RESUNIT, unit)
-        elif self._imagej:
-            unit = 1
-        else:
-            unit = 2
-        addtag("ResolutionUnit", "H", 1, unit)
-    elif not self._imagej:
-        addtag("XResolution", "2I", 1, (1, 1))
-        addtag("YResolution", "2I", 1, (1, 1))
-        addtag("ResolutionUnit", "H", 1, 1)
-
+        assert 2 <= len(resolution) <= 3, 'resolution arg must be len 2 or 3'
+        metadata['dx'] = resolution[0]
+        metadata['dy'] = resolution[1]
+        if len(resolution) == 3:
+            metadata['dz'] = resolution[2]
     return save(data, file, **kwargs)
+
+
+imwrite = imsave
