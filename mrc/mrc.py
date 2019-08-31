@@ -1183,7 +1183,7 @@ def imsave(file, data, resolution=None, metadata={}, **kwargs):
 imwrite = imsave
 
 
-def imread(file):
+def imread(file, writable=False):
     """Return image data from TIFF file(s) as numpy array.
 
     Args:
@@ -1194,4 +1194,4 @@ def imread(file):
             and header information is at arr.Mrc.header.  For dv format,
             extended header info may be available at arr.Mrc.extHdr
     """
-    return bindFile(file)
+    return bindFile(file, writable=writable)
