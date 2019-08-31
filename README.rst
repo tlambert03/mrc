@@ -14,7 +14,7 @@ Note, this module is designed to read the MRC variant used by
 deltavision microscopes (.dv). For the MRC file format frequently
 used for structural biology, see https://github.com/ccpem/mrcfile
 
-(thought dv and mrc formats are very similar, priism/dv files that
+(though dv and mrc formats are very similar, priism/dv files that
 evolved from the IVE library at UCSF have a slightly different
 header format, preventing mrcfile from working).
 
