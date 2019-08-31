@@ -60,8 +60,8 @@ Basic Usage
         }
     )
 
-MRC Header Format
-~~~~~~~~~~~~~~~~~
+Priism (DV) MRC Header Format
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 *this information is archived from the no-longer-existing page at
 http://www.msg.ucsf.edu/IVE/IVE4_HTML/priism_mrc_header.html*
