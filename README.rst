@@ -43,7 +43,7 @@ Basic Usage
 
     # or you can write a numpy array to DV format
     arr = np.random.rand(23,3,256,256).astype('single')
-    mrc.imsave(fn, arr,
+    mrc.imsave("/path/to/output.dv", arr,
         metadata={
             'dx': 0.08,
             'dy': 0.08,
