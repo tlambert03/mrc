@@ -18,6 +18,14 @@ used for structural biology, see https://github.com/ccpem/mrcfile
 evolved from the IVE library at UCSF have a slightly different
 header format, preventing mrcfile from working).
 
+Installation
+~~~~~~~~~~~~
+
+.. code-block:: bash
+
+    $ pip install mrc
+
+
 Basic Usage
 ~~~~~~~~~~~
 
