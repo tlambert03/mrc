@@ -14,9 +14,43 @@ Note, this module is designed to read the MRC variant used by
 deltavision microscopes (.dv). For the MRC file format frequently
 used for structural biology, see https://github.com/ccpem/mrcfile
 
-(thought dv and mrc formats are very similar, priism/dv files that evolved from the IVE
-library at UCSF have a slightly different header format, preventing mrcfile from working).
+(thought dv and mrc formats are very similar, priism/dv files that
+evolved from the IVE library at UCSF have a slightly different
+header format, preventing mrcfile from working).
 
+Basic Usage
+~~~~~~~~~~~
+
+.. code-block:: python
+
+    import mrc
+    import numpy as np
+
+    # Read a dv file
+    arr = mrc.imread('/path/to/file.dv')
+    # just a numpy array with the data...
+    isinstance(arr, np.ndarray)  # True
+
+    # additional info in stored in the arr.Mrc object.
+    # print it
+    arr.Mrc.info()
+    # or access particular fields:
+    print(arr.Mrc.header)
+    # dv files may have additional info in the extended header:
+    arr.Mrc.extended_header
+    # for instsance, timestamps for each channel at each timepoint:
+    arr.Mrc.extended_header['timeStampSeconds']
+
+    # or you can write a numpy array to DV format
+    arr = np.random.rand(23,3,256,256).astype('single')
+    mrc.imsave(fn, arr,
+        metadata={
+            'dx': 0.08,
+            'dy': 0.08,
+            'dz': 0.125,
+            'wave': [528, 615, 0, 0, 0]
+        }
+    )
 
 MRC Header Format
 ~~~~~~~~~~~~~~~~~

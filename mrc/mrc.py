@@ -193,13 +193,13 @@ class Mrc:
         self.extFloats = self.extHdrArray.field("float")
 
     @property
-    def extHdr(self):
+    def extended_header(self):
         """ended Header, reshaped to (# timepoints, # wavelengths)
         for dv files, can index as such:
           mrc.extHdr['timeStampSeconds'][t, c]
         where t and c are the timepoint and channel respectively
         """
-        if hasattr(self, 'extFloats'):
+        if hasattr(self, "extFloats"):
             return np.squeeze(self.extFloats.reshape((-1, self.hdr.NumWaves)))
         return None
 
@@ -1166,18 +1166,32 @@ mrcHdr_dtype = list(zip(mrcHdrNames, mrcHdrFormats))
 def imsave(file, data, resolution=None, metadata={}, **kwargs):
     """Write numpy array to mrc file
 
-    This is a wrapper on the mrc.save() function, meant to mimic a subset of 
+    This is a wrapper on the mrc.save() function, meant to mimic a subset of
     the tifffile.imsave API
         resolution : (float, float, float), or (float, float)
             X, Y, (and Z. if ndim==3) resolutions in microns per pixel.
     """
     if resolution is not None:
-        assert 2 <= len(resolution) <= 3, 'resolution arg must be len 2 or 3'
-        metadata['dx'] = resolution[0]
-        metadata['dy'] = resolution[1]
+        assert 2 <= len(resolution) <= 3, "resolution arg must be len 2 or 3"
+        metadata["dx"] = resolution[0]
+        metadata["dy"] = resolution[1]
         if len(resolution) == 3:
-            metadata['dz'] = resolution[2]
+            metadata["dz"] = resolution[2]
     return save(data, file, **kwargs)
 
 
 imwrite = imsave
+
+
+def imread(file):
+    """Return image data from TIFF file(s) as numpy array.
+
+    Args:
+        file (str): File name
+
+    Returns:
+        np.ndarray: numpy array with data.  Mrc object is stored at arr.Mrc,
+            and header information is at arr.Mrc.header.  For dv format,
+            extended header info may be available at arr.Mrc.extHdr
+    """
+    return bindFile(file)

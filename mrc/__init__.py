@@ -19,6 +19,9 @@ from .mrc import (
     makeHdrArray,
     hdrInfo,
     copyHdrInfo,
+    imsave,
+    imwrite,
+    imread,
 )
 
 __all__ = [
@@ -32,4 +35,7 @@ __all__ = [
     "makeHdrArray",
     "hdrInfo",
     "copyHdrInfo",
+    "imsave",
+    "imwrite",
+    "imread",
 ]
