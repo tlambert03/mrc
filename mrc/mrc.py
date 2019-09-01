@@ -1177,7 +1177,7 @@ def imsave(file, data, resolution=None, metadata={}, **kwargs):
         metadata["dy"] = resolution[1]
         if len(resolution) == 3:
             metadata["dz"] = resolution[2]
-    return save(data, file, **kwargs)
+    return save(data, file, metadata=metadata, **kwargs)
 
 
 imwrite = imsave
