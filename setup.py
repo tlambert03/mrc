@@ -32,6 +32,6 @@ setup(
     packages=find_packages(include=["mrc"]),
     test_suite="tests",
     url="https://github.com/tlambert03/mrc",
-    version='0.1.4',
+    version='0.1.5',
     zip_safe=False,
 )
