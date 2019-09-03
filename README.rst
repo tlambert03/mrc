@@ -8,7 +8,7 @@ MRC
         :target: https://travis-ci.com/tlambert03/mrc
 
 
-Read and write .mrc and .dv (deltavision) image file format
+Read and write .mrc and .dv (deltavision) image file format. Written by Sebastian Haase.
 
 Note, this module is designed to read the MRC variant used by
 deltavision microscopes (.dv). For the MRC file format frequently
