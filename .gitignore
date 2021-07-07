@@ -103,3 +103,4 @@ ENV/
 .mypy_cache/
 
 .vscode
+mrc/_version.py
