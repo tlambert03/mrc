@@ -11,19 +11,19 @@ __maintainer__ = "Talley Lambert"
 __email__ = "talley.lambert@gmail.com"
 
 from .mrc import (
-    bindFile,
     Mrc,
-    open,
-    load,
-    save,
     Mrc2,
-    shapeFromHdr,
-    makeHdrArray,
-    hdrInfo,
+    bindFile,
     copyHdrInfo,
+    hdrInfo,
+    imread,
     imsave,
     imwrite,
-    imread,
+    load,
+    makeHdrArray,
+    open,
+    save,
+    shapeFromHdr,
 )
 
 __all__ = [

@@ -14,10 +14,10 @@ Mrc class uses memory mapping (file size limit about 1GB (more or less)
 Mrc2 class section wise file/array I/O
 """
 
-import numpy as np
 import os
 import weakref
 
+import numpy as np
 
 try:
     input = raw_input
@@ -44,8 +44,7 @@ class Mrc:
     def __init__(
         self, path, mode="r", extHdrSize=0, extHdrNints=0, extHdrNfloats=0, dv=False
     ):
-        """mode can be 'r' or 'r+'
-        """
+        """mode can be 'r' or 'r+'"""
 
         self.path = os.path.abspath(path)
         self.dv = dv
@@ -92,17 +91,18 @@ class Mrc:
 
     # this could prevent garbage collector ...
     # http://arctrix.com/nas/python/gc/
-    # Circular references which are garbage are detected when the optional cycle detector
-    # is enabled (it's on by default), but can only be cleaned up if there are no
-    # Python-level __del__() methods involved. Refer to the documentation for the 'gc'
-    # module for more information about how __del__() methods are handled by the cycle
-    # detector, particularly the description of the garbage value. Notice: [warning]
-    # Due to the precarious circumstances under which __del__() methods are invoked,
-    # exceptions that occur during their execution are ignored, and a warning is printed
-    # to sys.stderr instead. Also, when __del__() is invoked in response to a module being
-    # deleted (e.g., when execution of the program is done), other globals referenced by
-    # the __del__() method may already have been deleted. For this reason, __del__()
-    # methods should do the absolute minimum needed to maintain external invariants.
+    # Circular references which are garbage are detected when the optional cycle
+    # detector is enabled (it's on by default), but can only be cleaned up if there are
+    # no Python-level __del__() methods involved. Refer to the documentation for the
+    # 'gc' module for more information about how __del__() methods are handled by the
+    # cycle detector, particularly the description of the garbage value. Notice:
+    # [warning] Due to the precarious circumstances under which __del__() methods are
+    # invoked, exceptions that occur during their execution are ignored, and a warning
+    # is printed to sys.stderr instead. Also, when __del__() is invoked in response to a
+    # module being deleted (e.g., when execution of the program is done), other globals
+    # referenced by the __del__() method may already have been deleted. For this reason,
+    # __del__() methods should do the absolute minimum needed to maintain external
+    # invariants.
     #   def __del__(self):
     #       print "debug: Mrc.__del__ (close()) called !"
     #       try:
@@ -680,8 +680,7 @@ class Mrc2:
         self._f.seek(self._hdrSize)
 
     def readSec(self, i=None):
-        """ if i is None read "next" section at current position
-        """
+        """if i is None read "next" section at current position"""
         if i is not None:
             self.seekSec(i)
         a = np.fromfile(self._f, self._dtype, np.prod(self._shape2d))
@@ -689,16 +688,14 @@ class Mrc2:
         return a
 
     def writeSec(self, a, i=None):
-        """ if i is None write "next" section at current position
-        """
+        """if i is None write "next" section at current position"""
         if i is not None:
             self.seekSec(i)
         # todo check type, shape
         return a.tofile(self._f)
 
     def readStack(self, nz, i=None):
-        """ if i is None read "next" section at current position
-        """
+        """if i is None read "next" section at current position"""
         if i is not None:
             self.seekSec(i)
         a = np.fromfile(self._f, self._dtype, nz * np.prod(self._shape2d))
@@ -706,8 +703,7 @@ class Mrc2:
         return a
 
     def writeStack(self, a, i=None):
-        """ if i is None write "next" section at current position
-        """
+        """if i is None write "next" section at current position"""
         if i is not None:
             self.seekSec(i)
         # todo check type, shape
@@ -728,8 +724,7 @@ class Mrc2:
 
 ###########################################################################
 def minExtHdrSize(nSecs, bytesPerSec):
-    """return smallest multiple of 1024 to fit extHdr data
-    """
+    """return smallest multiple of 1024 to fit extHdr data"""
     return int(np.ceil(nSecs * bytesPerSec / 1024.0) * 1024)
 
 
@@ -1000,8 +995,7 @@ def axisOrderStr(hdr, onlyLetters=True):
 
 
 def init_simple(hdr, mode, nxOrShape, ny=None, nz=None):
-    """note: if  nxOrShape is tuple it is nz,ny,nx (note the order!!)
-    """
+    """note: if  nxOrShape is tuple it is nz,ny,nx (note the order!!)"""
     if ny is nz is None:
         if len(nxOrShape) == 2:
             nz, (ny, nx) = 1, nxOrShape
