@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/pypi/l/mrc.svg?color=green)](https://github.com/tlambert03/mrc/raw/master/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/mrc.svg?color=green)](https://pypi.org/project/mrc)
 [![Python Version](https://img.shields.io/pypi/pyversions/mrc.svg?color=green)](https://python.org)
-[![tests](https://github.com/tlambert03/mrc/workflows/tests/badge.svg)](https://github.com/tlambert03/mrc/actions)
+[![CI](https://github.com/tlambert03/mrc/workflows/CI/badge.svg)](https://github.com/tlambert03/mrc/actions)
 [![codecov](https://codecov.io/gh/tlambert03/mrc/branch/master/graph/badge.svg)](https://codecov.io/gh/tlambert03/mrc)
 
 Read and write .mrc and .dv (deltavision) image file format.
