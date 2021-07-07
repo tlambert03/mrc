@@ -1,12 +1,14 @@
-# -*- coding: utf-8 -*-
-
 """Top-level package for mrc.py."""
 
-__author__ = """Sebastian Haase"""
+try:
+    from ._version import version as __version__
+except ImportError:
+    __version__ = "unknown"
+__author__ = "Talley Lambert"
+__email__ = "talley.lambert@gmail.com"
+__author__ = "Sebastian Haase"
 __maintainer__ = "Talley Lambert"
-__email__ = "talley@hms.harvard.edu"
-__license__ = "BSD license - see LICENSE file"
-__version__ = "__version__ = '0.1.5'"
+__email__ = "talley.lambert@gmail.com"
 
 from .mrc import (
     bindFile,
