@@ -1,4 +1,18 @@
-D = {
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Dict, TypedDict
+
+    class LensDict(TypedDict):
+        name: str
+        lensNA: float
+        magnification: float
+        immersion: str
+        model: str
+        correction: str
+
+
+D: "Dict[int, LensDict]" = {
     10100: {
         "name": "Olympus 10X/0.30, S Plan Achromat, phase, IMT2",
         "lensNA": 0.30,
