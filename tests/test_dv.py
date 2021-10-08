@@ -7,6 +7,7 @@ import pytest
 from mrc._new import DVFile
 
 DATA = Path(__file__).parent / "data"
+IMAGES = [f for f in DATA.iterdir() if f.suffix in {".dv", ".r3d"}]
 
 
 @pytest.fixture(autouse=True)
@@ -17,7 +18,7 @@ def no_files_left_open():
     assert files_before == files_after == set()
 
 
-@pytest.mark.parametrize("fname", DATA.glob("*.dv"), ids=lambda x: x.name)
+@pytest.mark.parametrize("fname", IMAGES, ids=lambda x: x.name)
 def test_read_dv(fname):
     assert DVFile.is_supported_file(fname)
     with DVFile(fname) as f:
@@ -25,4 +26,6 @@ def test_read_dv(fname):
         assert f.ndim == len(f.shape)
         assert isinstance(f.lens, str)
         assert f.hdr.image_type
-        assert np.asarray(f).shape == tuple(x for x in f.shape if x > 1)
+        arr = np.asarray(f)
+        np.testing.assert_array_equal(f.to_xarray(delayed=True, squeeze=True), arr)
+        assert arr.shape == tuple(x for x in f.shape if x > 1)

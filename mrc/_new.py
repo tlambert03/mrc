@@ -5,10 +5,25 @@ from typing import TYPE_CHECKING, Any, Dict, NamedTuple, Optional, Tuple, Union
 import numpy as np
 
 if TYPE_CHECKING:
+    import dask.array as da
     import xarray as xr
 
 __author__ = "Talley Lambert"
 __email__ = "talley.lambert@gmail.com"
+
+HDR_FORMAT = "10i6f3i3f2i2hi24s4h6f6h2f2h3f6h3fi800s"
+LE_HDR = struct.Struct("<" + HDR_FORMAT)
+BE_HDR = struct.Struct(">" + HDR_FORMAT)
+
+
+def _byte_order(fh):
+    fh.seek(24 * 4)
+    dvid = fh.read(2)
+    if dvid == b"\xa0\xc0":
+        return LE_HDR
+    if dvid == b"\xc0\xa0":
+        return BE_HDR
+    return None
 
 
 class DVFile:
@@ -19,7 +34,11 @@ class DVFile:
     def __init__(self, path: Union[str, Path]) -> None:
         self._path = path
         with open(path, "rb") as fh:
-            *r, self._title = _HDR.unpack(fh.read(_HDR.size))
+            head_struct = _byte_order(fh)
+            if head_struct is None:
+                raise ValueError(f"{path} is not a recognized DV file.")
+            fh.seek(0)
+            *r, self._title = head_struct.unpack(fh.read(head_struct.size))
             self.hdr = Header(*r)
             if self.hdr.ext_hdr_len:
                 self.ext_hdr = ExtHeader(fh.read(self.hdr.ext_hdr_len), self.hdr)
@@ -38,7 +57,7 @@ class DVFile:
             self._data: np.memmap = np.memmap(
                 str(self._path),
                 self.dtype,
-                offset=_HDR.size + self.hdr.ext_hdr_len,
+                offset=LE_HDR.size + self.hdr.ext_hdr_len,
                 shape=self.shape,
             )
 
@@ -65,7 +84,17 @@ class DVFile:
     def asarray(self, squeeze=True) -> np.ndarray:
         return self.data.squeeze() if squeeze else self.data
 
-    def to_xarray(self, squeeze=True) -> "xr.DataArray":
+    def to_dask(self) -> "da.Array":
+        from dask.array import map_blocks
+
+        chunks = [(1,) * v if k in "TZC" else (v,) for k, v in self.sizes.items()]
+        return map_blocks(self._dask_block, chunks=chunks, dtype=self.dtype)
+
+    def _dask_block(self, block_id: Tuple[int]) -> np.ndarray:
+        ncoords = 3
+        return self[block_id[:ncoords]][(np.newaxis,) * ncoords]
+
+    def to_xarray(self, delayed=False, squeeze=True) -> "xr.DataArray":
         import xarray as xr
 
         attrs = {"header": self.hdr._asdict()}
@@ -73,10 +102,10 @@ class DVFile:
         if self.ext_hdr:
             attrs["extended_header"] = self.ext_hdr._asdict()
         arr = xr.DataArray(
-            np.asarray(self.data),
+            self.to_dask() if delayed else np.asarray(self.data),
             dims=list(self.sizes),
             coords=self._expand_coords(),
-            attrs=attrs,
+            attrs={"metadata": attrs},
         )
         return arr.squeeze() if squeeze else arr
 
@@ -144,20 +173,24 @@ class DVFile:
     def lens(self) -> str:
         return self.hdr.lens
 
+    def __repr__(self) -> str:
+        try:
+            details = " (closed)" if self.closed else f" {self.dtype}: {self.sizes!r}"
+            extra = f": {Path(self._path).name!r}{details}"
+        except Exception:
+            extra = ""
+        return f"<ND2File at {hex(id(self))}{extra}>"
+
     @staticmethod
     def is_supported_file(path):
         with open(path, "rb") as fh:
-            fh.seek(24 * 4)
-            return fh.read(2) == b"\xa0\xc0"  # -16224
+            return _byte_order(fh) is not None
 
 
 class Voxel(NamedTuple):
     x: float
     y: float
     z: float
-
-
-_HDR = struct.Struct("10i6f3i3f2i2hi24s4h6f6h2f2h3f6h3fi800s")
 
 
 class Header(NamedTuple):
@@ -185,39 +218,39 @@ class Header(NamedTuple):
     mean: float
     space_group_num: int
     ext_hdr_len: int
-    dvid: int
-    nblank: int
+    dvid: int  # 2
+    nblank: int  # 2
     t_start: int
-    blank: str
-    n_ints: int
-    n_floats: int
-    n_subres: int
-    zfac: int
+    blank: str  # 24
+    n_ints: int  # 2
+    n_floats: int  # 2
+    n_subres: int  # 2
+    zfac: int  # 2
     min2: float
     max2: float
     min3: float
     max3: float
     min4: float
     max4: float
-    img_type: int
-    lens_num: int
-    n1: int
-    n2: int
-    v1: int
-    v2: int
+    img_type: int  # 2
+    lens_num: int  # 2
+    n1: int  # 2
+    n2: int  # 2
+    v1: int  # 2
+    v2: int  # 2
     min5: float
     max5: float
-    nt: int
-    img_seq: int
+    nt: int  # 2
+    img_seq: int  # 2
     x_tilt: float
     y_tilt: float
     z_tilt: float
-    nc: int
-    wave1: int
-    wave2: int
-    wave3: int
-    wave4: int
-    wave5: int
+    nc: int  # 2
+    wave1: int  # 2
+    wave2: int  # 2
+    wave3: int  # 2
+    wave4: int  # 2
+    wave5: int  # 2
     z0: float
     x0: float
     y0: float
@@ -228,7 +261,11 @@ class Header(NamedTuple):
     def sequence_order(self):
         # note, these are reversed from the header readme,
         # to reflect how numpy parses the memmap
-        return ["CTZ", "TZC", "TCZ"][self.img_seq]
+        return {
+            0: "CTZ",
+            1: "TZC",
+            2: "TCZ",
+        }[self.img_seq]
 
     @property
     def nz(self):
