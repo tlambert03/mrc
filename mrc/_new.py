@@ -1,15 +1,20 @@
 import struct
 from pathlib import Path
-from typing import NamedTuple, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
+
+if TYPE_CHECKING:
+    import xarray as xr
 
 
 class DVFile:
     ext_hdr: Optional["ExtHeader"]
     hdr: "Header"
+    _data: Optional[np.memmap] = None
 
     def __init__(self, path: Union[str, Path]) -> None:
+        self._path = path
         with open(path, "rb") as fh:
             *r, self._title = _HDR.unpack(fh.read(_HDR.size))
             self.hdr = Header(*r)
@@ -17,13 +22,7 @@ class DVFile:
                 self.ext_hdr = ExtHeader(fh.read(self.hdr.ext_hdr_len), self.hdr)
             else:
                 self.ext_hdr = None
-
-        self.data: np.memmap = np.memmap(
-            fh.name,
-            self.dtype,
-            offset=_HDR.size + self.hdr.ext_hdr_len,
-            shape=self.shape,
-        )
+        self.open()
 
     def __enter__(self) -> "DVFile":
         return self
@@ -31,8 +30,31 @@ class DVFile:
     def __exit__(self, *a) -> None:
         self.close()
 
+    def open(self):
+        if self.closed:
+            self._data: np.memmap = np.memmap(
+                str(self._path),
+                self.dtype,
+                offset=_HDR.size + self.hdr.ext_hdr_len,
+                shape=self.shape,
+            )
+
     def close(self) -> None:
-        self.data._mmap.close()
+        if not self.closed:
+            self.data._mmap.close()
+            self._data = None
+
+    @property
+    def closed(self) -> bool:
+        return self._data is None
+
+    @property
+    def data(self) -> np.memmap:
+        if self._data is None:
+            raise RuntimeError(
+                "Cannot read from closed file.  Please reopen with .open()"
+            )
+        return self._data
 
     def __array__(self) -> np.ndarray:
         return self.asarray()
@@ -40,7 +62,7 @@ class DVFile:
     def asarray(self, squeeze=True) -> np.ndarray:
         return self.data.squeeze() if squeeze else self.data
 
-    def to_xarray(self, squeeze=True):
+    def to_xarray(self, squeeze=True) -> "xr.DataArray":
         import xarray as xr
 
         attrs = {"header": self.hdr._asdict()}
@@ -55,7 +77,7 @@ class DVFile:
         )
         return arr.squeeze() if squeeze else arr
 
-    def _expand_coords(self):
+    def _expand_coords(self) -> Dict[str, Any]:
         ord = self.hdr.sequence_order[::-1]
         _map = {
             "C": "exWavelen",
@@ -73,27 +95,27 @@ class DVFile:
         return coords
 
     @property
-    def shape(self):
+    def shape(self) -> Tuple[int, ...]:
         return tuple(self.sizes.values())
 
     @property
-    def ndim(self):
+    def ndim(self) -> int:
         return len(self.shape)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> np.ndarray:
         return self.data[key]
 
     @property
-    def axes(self):
+    def axes(self) -> str:
         return self.hdr.sequence_order + "YX"
 
     @property
-    def dtype(self):
+    def dtype(self) -> type:
         return [
             np.uint8,
             np.int16,
             np.float32,
-            None,
+            np.complex64,
             np.complex64,
             np.int16,
             np.uint16,
@@ -101,7 +123,7 @@ class DVFile:
         ][self.hdr.pixel_type]
 
     @property
-    def sizes(self):
+    def sizes(self) -> Dict[str, int]:
         d = {
             "T": self.hdr.nt,
             "C": self.hdr.nc,
