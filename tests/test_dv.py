@@ -1,3 +1,4 @@
+import gc
 from pathlib import Path
 
 import numpy as np
@@ -13,6 +14,7 @@ DATA = Path(__file__).parent / "data"
 def no_files_left_open():
     files_before = {p for p in psutil.Process().open_files() if p.path.endswith("dv")}
     yield
+    gc.collect()
     files_after = {p for p in psutil.Process().open_files() if p.path.endswith("dv")}
     assert files_before == files_after == set()
 
