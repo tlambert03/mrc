@@ -19,6 +19,7 @@ def no_files_left_open():
 
 @pytest.mark.parametrize("fname", DATA.glob("*.dv"), ids=lambda x: x.name)
 def test_read_dv(fname):
+    assert DVFile.is_supported_file(fname)
     with DVFile(fname) as f:
         assert f.to_xarray(squeeze=False).shape == f.shape
         assert f.ndim == len(f.shape)

@@ -1,15 +1,12 @@
-"""Top-level package for mrc.py."""
+"""DV (deltavision) file reader."""
 
 try:
     from ._version import version as __version__
 except ImportError:
     __version__ = "unknown"
-__author__ = "Talley Lambert"
-__email__ = "talley.lambert@gmail.com"
-__author__ = "Sebastian Haase"
-__maintainer__ = "Talley Lambert"
-__email__ = "talley.lambert@gmail.com"
 
+
+from ._new import DVFile
 from .mrc import (
     Mrc,
     Mrc2,
@@ -27,6 +24,7 @@ from .mrc import (
 )
 
 __all__ = [
+    "DVFile",
     "bindFile",
     "Mrc",
     "open",

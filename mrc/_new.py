@@ -7,6 +7,9 @@ import numpy as np
 if TYPE_CHECKING:
     import xarray as xr
 
+__author__ = "Talley Lambert"
+__email__ = "talley.lambert@gmail.com"
+
 
 class DVFile:
     ext_hdr: Optional["ExtHeader"]
@@ -140,6 +143,12 @@ class DVFile:
     @property
     def lens(self) -> str:
         return self.hdr.lens
+
+    @staticmethod
+    def is_supported_file(path):
+        with open(path, "rb") as fh:
+            fh.seek(24 * 4)
+            return fh.read(2) == b"\xa0\xc0"  # -16224
 
 
 class Voxel(NamedTuple):
