@@ -6,14 +6,13 @@ except ImportError:
     __version__ = "unknown"
 
 
-from ._new import DVFile
+from ._new import DVFile, imread
 from .mrc import (
     Mrc,
     Mrc2,
     bindFile,
     copyHdrInfo,
     hdrInfo,
-    imread,
     imsave,
     imwrite,
     load,

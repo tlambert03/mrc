@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from mrc import imread
+from mrc.mrc import imread
 
 dv_file = Path(__file__).parent / "toxo.dv"
 

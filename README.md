@@ -6,7 +6,7 @@
 [![CI](https://github.com/tlambert03/mrc/workflows/CI/badge.svg)](https://github.com/tlambert03/mrc/actions)
 [![codecov](https://codecov.io/gh/tlambert03/mrc/branch/master/graph/badge.svg)](https://codecov.io/gh/tlambert03/mrc)
 
-Read and write .mrc and .dv (deltavision) image file format.
+Read and write .dv (deltavision) and some mrc image file format.
 
 Note, this module is designed to read the MRC variant used by deltavision
 microscopes (.dv) and the IVE library from UCSF. For the MRC2014 file format
@@ -17,17 +17,67 @@ frequently used for structural biology, see
 the IVE library at UCSF have a slightly different header format, preventing
 mrcfile from working).
 
-This module was extracted from the
-[priithon](https://github.com/sebhaase/priithon) package, written by Sebastian
-Haase.
-
 ## Install
 
 ```sh
 pip install mrc
 ```
 
-## Usage
+## usage and API
+
+### new API: Oct 2021
+
+`DVFile` is a rewrite of the reader, and will be the only maintained
+reader going forward.  It does not write files (see the legacy API for that).
+
+```python
+from mrc import DVFile, imread
+import numpy as np
+
+my_array = imread('some_file.dv')                          # read to numpy array
+my_array = imread('some_file.dv', dask=True)               # read to dask array
+my_array = imread('some_file.dv', xarray=True)             # read to xarray
+my_array = imread('some_file.dv', xarray=True, dask=True)  # read to dask-xarray
+
+# or open a file with DVFile
+f = DVFile('some_file.dv')
+
+# attributes:   # example output
+f.path          # 'some_file.dv'
+f.shape         # (10, 2, 256, 256)
+f.ndim          # 4
+f.dtype         # np.dtype('uint16')
+f.sizes         # {'T': 10, 'C': 2, 'Y': 256, 'X': 256}
+
+# array output
+f.asarray()                # in-memory np.ndarray
+np.asarray(f)              # alternative to f.asarray()
+f.to_dask()                # delayed dask.array.Array
+f.to_xarray()              # in-memory xarray.DataArray, with labeled axes/coords
+f.to_xarray(delayed=True)  # delayed xarray.DataArray
+
+                # see below for examples of these structures
+# metadata      # returns instance of ...
+f.hdr           # Header as a named tuple
+f.ext_hdr       # (optional) extended header info
+f.voxel_size    # VoxelSize(x=0.65, y=0.65, z=1.0)
+
+f.close()       # don't forget to close when done!
+f.closed        # boolean, whether the file is closed
+
+# ... or you can use it as a context manager
+with DVFile('some_file.dv') as dvf:
+    xarr = dvf.to_xarray()
+```
+
+### legacy API
+
+The following older API still exists in this package under the mrc namespace.
+
+This module was extracted from the
+[priithon](https://github.com/sebhaase/priithon) package, written by Sebastian
+Haase.
+
 
 ```python
 import mrc

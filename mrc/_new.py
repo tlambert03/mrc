@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import struct
 from pathlib import Path
 from typing import (
@@ -10,11 +12,14 @@ from typing import (
     Optional,
     Tuple,
     Union,
+    overload,
 )
 
 import numpy as np
 
 if TYPE_CHECKING:
+    from typing import Literal
+
     import dask.array as da
     import xarray as xr
 
@@ -23,18 +28,20 @@ __email__ = "talley.lambert@gmail.com"
 
 
 class DVFile:
-    ext_hdr: Optional["ExtHeader"]
-    hdr: "Header"
+    ext_hdr: Optional[ExtHeader]
+    hdr: Header
     _data: Optional[np.memmap] = None
 
     def __init__(self, path: Union[str, Path]) -> None:
         self._path = str(path)
         with open(path, "rb") as fh:
-            head_struct = _pick_struct(fh)
-            if head_struct is None:
+            self._byte_order = _byte_order(fh)
+            if self._byte_order is None:
                 raise ValueError(f"{path} is not a recognized DV file.")
             fh.seek(0)
-            *r, self._title = head_struct.unpack(fh.read(head_struct.size))
+            strct = LE_HDR if self._byte_order == "<" else BE_HDR
+            *r, self._title = strct.unpack(fh.read(strct.size))
+
             self.hdr = Header(*r)
             if self.hdr.ext_hdr_len:
                 self.ext_hdr = ExtHeader(fh.read(self.hdr.ext_hdr_len), self.hdr)
@@ -43,6 +50,7 @@ class DVFile:
         self.open()
 
     def __enter__(self) -> "DVFile":
+        self.open()
         return self
 
     def __exit__(self, *a) -> None:
@@ -82,13 +90,13 @@ class DVFile:
         return self.asarray()
 
     def asarray(self, squeeze=True) -> np.ndarray:
-        return self.data.squeeze() if squeeze else self.data
+        return (self.data.squeeze() if squeeze else self.data).copy()
 
-    def to_dask(self) -> "da.Array":
-        from dask.array import map_blocks
+    def to_dask(self) -> da.Array:
+        import dask.array as da
 
         chunks = [(1,) * v if k in "TZC" else (v,) for k, v in self.sizes.items()]
-        return map_blocks(self._dask_block, chunks=chunks, dtype=self.dtype)
+        return da.map_blocks(self._dask_block, chunks=chunks, dtype=self.dtype)
 
     def _dask_block(self, block_id: Tuple[int]) -> np.ndarray:
         ncoords = 3
@@ -97,22 +105,18 @@ class DVFile:
     def to_xarray(self, delayed=False, squeeze=True) -> "xr.DataArray":
         import xarray as xr
 
-        attrs = {"header": self.hdr._asdict()}
-        attrs["header"].pop("blank")
-        if self.ext_hdr:
-            attrs["extended_header"] = self.ext_hdr._asdict()
         arr = xr.DataArray(
-            self.to_dask() if delayed else np.asarray(self.data),
+            self.to_dask() if delayed else self.asarray(squeeze),
             dims=list(self.sizes),
             coords=self._expand_coords(),
-            attrs={"metadata": attrs},
+            attrs={"metadata": self.metadata},
         )
         return arr.squeeze() if squeeze else arr
 
     def _expand_coords(self) -> Dict[str, Any]:
         ord = self.hdr.sequence_order[::-1]
         _map: Dict[str, Callable[[ExtHeaderFrame], str]] = {
-            "C": lambda x: f"{x.exWavelen}/{x.emWavelen}",
+            "C": lambda x: f"{x.exWavelen:.0f}/{x.emWavelen:.0f}",
             "T": lambda x: f"{x.timeStampSeconds}",
             "Z": lambda x: f"{x.stageZCoord}",
         }
@@ -142,17 +146,18 @@ class DVFile:
         return self.hdr.sequence_order + "YX"
 
     @property
-    def dtype(self) -> type:
-        return [
-            np.uint8,
-            np.int16,
-            np.float32,
-            np.complex64,
-            np.complex64,
-            np.int16,
-            np.uint16,
-            np.int32,
-        ][self.hdr.pixel_type]
+    def dtype(self) -> np.dtype:
+        char = {
+            0: f"{self._byte_order}u1",
+            1: f"{self._byte_order}i2",
+            2: f"{self._byte_order}f4",
+            # 3: f"{self._byte_order}c4",  # not a thing in numpy
+            4: f"{self._byte_order}c8",
+            5: f"{self._byte_order}i2",
+            6: f"{self._byte_order}u2",
+            7: f"{self._byte_order}i4",
+        }[self.hdr.pixel_type]
+        return np.dtype(char)
 
     @property
     def sizes(self) -> Dict[str, int]:
@@ -166,8 +171,16 @@ class DVFile:
         return {k: d[k] for k in self.axes}
 
     @property
-    def voxel_size(self) -> "Voxel":
+    def voxel_size(self) -> Voxel:
         return Voxel(self.hdr.dx, self.hdr.dy, self.hdr.dz)
+
+    @property
+    def metadata(self) -> dict:
+        meta = {"header": self.hdr._asdict()}
+        meta["header"].pop("blank")
+        if self.ext_hdr:
+            meta["extended_header"] = self.ext_hdr._asdict()
+        return meta
 
     @property
     def lens(self) -> str:
@@ -185,7 +198,7 @@ class DVFile:
     def is_supported_file(path) -> bool:
         try:
             with open(path, "rb") as fh:
-                return _pick_struct(fh) is not None
+                return _byte_order(fh) is not None
         except Exception:
             return False
 
@@ -195,13 +208,13 @@ LE_HDR = struct.Struct("<" + HDR_FORMAT)
 BE_HDR = struct.Struct(">" + HDR_FORMAT)
 
 
-def _pick_struct(fh: BinaryIO) -> Optional[struct.Struct]:
+def _byte_order(fh: BinaryIO) -> Optional[str]:
     fh.seek(24 * 4)
     dvid = fh.read(2)
     if dvid == b"\xa0\xc0":
-        return LE_HDR
+        return "<"
     if dvid == b"\xc0\xa0":
-        return BE_HDR
+        return ">"
     return None
 
 
@@ -336,6 +349,7 @@ class ExtHeader:
         self._hdr = hdr
         self.n_frames = hdr.n_sections
         self._section_length = (hdr.n_floats + hdr.n_ints) * 4
+        self._order = hdr.sequence_order
         self._shape = [getattr(hdr, f"n{i.lower()}") for i in hdr.sequence_order]
         self._struct = struct.Struct(f"{hdr.n_ints}i{len(ExtHeaderFrame._fields)}f")
 
@@ -347,6 +361,35 @@ class ExtHeader:
 
     def _asdict(self) -> dict:
         return {
-            np.unravel_index(i, self._shape): self.frame(i)._asdict()
+            "".join(
+                f"{x}{y}" for x, y in zip(self._order, np.unravel_index(i, self._shape))
+            ): self.frame(i)._asdict()
             for i in range(self.n_frames)
         }
+
+
+@overload
+def imread(
+    file: str, dask: Literal[False] = False, xarray: Literal[False] = False
+) -> np.ndarray:
+    ...
+
+
+@overload
+def imread(file: str, dask: bool = ..., xarray: Literal[True] = True) -> xr.DataArray:
+    ...
+
+
+@overload
+def imread(file: str, dask: Literal[True] = ..., xarray=False) -> da.Array:
+    ...
+
+
+def imread(file: str, dask: bool = False, xarray: bool = False):
+    with DVFile(file) as dvf:
+        if xarray:
+            return dvf.to_xarray(delayed=dask)
+        elif dask:
+            return dvf.to_dask()
+        else:
+            return dvf.asarray()
