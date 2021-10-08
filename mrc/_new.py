@@ -182,9 +182,12 @@ class DVFile:
         return f"<ND2File at {hex(id(self))}{extra}>"
 
     @staticmethod
-    def is_supported_file(path):
-        with open(path, "rb") as fh:
-            return _pick_struct(fh) is not None
+    def is_supported_file(path) -> bool:
+        try:
+            with open(path, "rb") as fh:
+                return _pick_struct(fh) is not None
+        except Exception:
+            return False
 
 
 HDR_FORMAT = "10i6f3i3f2i2hi24s4h6f6h2f2h3f6h3fi800s"
