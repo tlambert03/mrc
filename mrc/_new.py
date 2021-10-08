@@ -25,6 +25,9 @@ class DVFile:
             shape=self.shape,
         )
 
+    def __del__(self):
+        del self.data
+
     def __array__(self):
         return self.asarray()
 
