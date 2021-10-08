@@ -1,4 +1,3 @@
-import gc
 from pathlib import Path
 
 import numpy as np
@@ -14,16 +13,15 @@ DATA = Path(__file__).parent / "data"
 def no_files_left_open():
     files_before = {p for p in psutil.Process().open_files() if p.path.endswith("dv")}
     yield
-    gc.collect()
     files_after = {p for p in psutil.Process().open_files() if p.path.endswith("dv")}
     assert files_before == files_after == set()
 
 
 @pytest.mark.parametrize("fname", DATA.glob("*.dv"), ids=lambda x: x.name)
 def test_read_dv(fname):
-    f = DVFile(fname)
-    assert f.to_xarray(squeeze=False).shape == f.shape
-    assert f.ndim == len(f.shape)
-    assert isinstance(f.lens, str)
-    assert f.hdr.image_type
-    assert np.asarray(f).shape == tuple(x for x in f.shape if x > 1)
+    with DVFile(fname) as f:
+        assert f.to_xarray(squeeze=False).shape == f.shape
+        assert f.ndim == len(f.shape)
+        assert isinstance(f.lens, str)
+        assert f.hdr.image_type
+        assert np.asarray(f).shape == tuple(x for x in f.shape if x > 1)

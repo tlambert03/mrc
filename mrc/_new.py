@@ -25,13 +25,19 @@ class DVFile:
             shape=self.shape,
         )
 
-    def __del__(self):
-        del self.data
+    def __enter__(self) -> "DVFile":
+        return self
 
-    def __array__(self):
+    def __exit__(self, *a) -> None:
+        self.close()
+
+    def close(self) -> None:
+        self.data._mmap.close()
+
+    def __array__(self) -> np.ndarray:
         return self.asarray()
 
-    def asarray(self, squeeze=True):
+    def asarray(self, squeeze=True) -> np.ndarray:
         return self.data.squeeze() if squeeze else self.data
 
     def to_xarray(self, squeeze=True):
