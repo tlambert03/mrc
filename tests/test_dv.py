@@ -7,7 +7,7 @@ import pytest
 from mrc._new import DVFile
 
 DATA = Path(__file__).parent / "data"
-IMAGES = [f for f in DATA.iterdir() if f.suffix in {".dv", ".r3d"}]
+IMAGES = [f for f in DATA.iterdir() if f.suffix in {".dv", ".r3d", ".otf"}]
 
 
 @pytest.fixture(autouse=True)
@@ -29,3 +29,6 @@ def test_read_dv(fname):
         arr = np.asarray(f)
         np.testing.assert_array_equal(f.to_xarray(delayed=True, squeeze=True), arr)
         assert arr.shape == tuple(x for x in f.shape if x > 1)
+
+        if f.path.endswith("otf"):
+            assert np.iscomplexobj(arr)

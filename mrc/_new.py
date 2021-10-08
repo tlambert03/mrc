@@ -1,6 +1,16 @@
 import struct
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, NamedTuple, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    BinaryIO,
+    Callable,
+    Dict,
+    NamedTuple,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import numpy as np
 
@@ -11,20 +21,6 @@ if TYPE_CHECKING:
 __author__ = "Talley Lambert"
 __email__ = "talley.lambert@gmail.com"
 
-HDR_FORMAT = "10i6f3i3f2i2hi24s4h6f6h2f2h3f6h3fi800s"
-LE_HDR = struct.Struct("<" + HDR_FORMAT)
-BE_HDR = struct.Struct(">" + HDR_FORMAT)
-
-
-def _byte_order(fh):
-    fh.seek(24 * 4)
-    dvid = fh.read(2)
-    if dvid == b"\xa0\xc0":
-        return LE_HDR
-    if dvid == b"\xc0\xa0":
-        return BE_HDR
-    return None
-
 
 class DVFile:
     ext_hdr: Optional["ExtHeader"]
@@ -32,9 +28,9 @@ class DVFile:
     _data: Optional[np.memmap] = None
 
     def __init__(self, path: Union[str, Path]) -> None:
-        self._path = path
+        self._path = str(path)
         with open(path, "rb") as fh:
-            head_struct = _byte_order(fh)
+            head_struct = _pick_struct(fh)
             if head_struct is None:
                 raise ValueError(f"{path} is not a recognized DV file.")
             fh.seek(0)
@@ -52,9 +48,9 @@ class DVFile:
     def __exit__(self, *a) -> None:
         self.close()
 
-    def open(self):
+    def open(self) -> None:
         if self.closed:
-            self._data: np.memmap = np.memmap(
+            self._data = np.memmap(
                 str(self._path),
                 self.dtype,
                 offset=LE_HDR.size + self.hdr.ext_hdr_len,
@@ -65,6 +61,10 @@ class DVFile:
         if not self.closed:
             self.data._mmap.close()
             self._data = None
+
+    @property
+    def path(self) -> str:
+        return self._path
 
     @property
     def closed(self) -> bool:
@@ -111,10 +111,10 @@ class DVFile:
 
     def _expand_coords(self) -> Dict[str, Any]:
         ord = self.hdr.sequence_order[::-1]
-        _map = {
-            "C": "exWavelen",
-            "T": "timeStampSeconds",
-            "Z": "stageZCoord",
+        _map: Dict[str, Callable[[ExtHeaderFrame], str]] = {
+            "C": lambda x: f"{x.exWavelen}/{x.emWavelen}",
+            "T": lambda x: f"{x.timeStampSeconds}",
+            "Z": lambda x: f"{x.stageZCoord}",
         }
         coords = {}
         for key, val in self.sizes.items():
@@ -123,7 +123,7 @@ class DVFile:
             elif self.ext_hdr:
                 stride = np.prod([self.sizes[ord[i]] for i in range(ord.index(key))])
                 f = [self.ext_hdr.frame(i * int(stride)) for i in range(val)]
-                coords[key] = [getattr(x, _map[key]) for x in f]
+                coords[key] = [_map[key](x) for x in f]
         return coords
 
     @property
@@ -184,7 +184,22 @@ class DVFile:
     @staticmethod
     def is_supported_file(path):
         with open(path, "rb") as fh:
-            return _byte_order(fh) is not None
+            return _pick_struct(fh) is not None
+
+
+HDR_FORMAT = "10i6f3i3f2i2hi24s4h6f6h2f2h3f6h3fi800s"
+LE_HDR = struct.Struct("<" + HDR_FORMAT)
+BE_HDR = struct.Struct(">" + HDR_FORMAT)
+
+
+def _pick_struct(fh: BinaryIO) -> Optional[struct.Struct]:
+    fh.seek(24 * 4)
+    dvid = fh.read(2)
+    if dvid == b"\xa0\xc0":
+        return LE_HDR
+    if dvid == b"\xc0\xa0":
+        return BE_HDR
+    return None
 
 
 class Voxel(NamedTuple):
@@ -258,7 +273,7 @@ class Header(NamedTuple):
     # title: str
 
     @property
-    def sequence_order(self):
+    def sequence_order(self) -> str:
         # note, these are reversed from the header readme,
         # to reflect how numpy parses the memmap
         return {
@@ -268,11 +283,11 @@ class Header(NamedTuple):
         }[self.img_seq]
 
     @property
-    def nz(self):
+    def nz(self) -> int:
         return self.n_sections // (self.nc or 1) // (self.nt or 1)
 
     @property
-    def image_type(self):
+    def image_type(self) -> str:
         return {
             0: "NORMAL",
             100: "NORMAL",
@@ -313,11 +328,10 @@ class ExtHeaderFrame(NamedTuple):
 
 
 class ExtHeader:
-    def __init__(self, buf, hdr: Header) -> None:
+    def __init__(self, buf: bytes, hdr: Header) -> None:
         self.buffer = buf
         self._hdr = hdr
         self.n_frames = hdr.n_sections
-        self.n_floats = hdr.n_floats
         self._section_length = (hdr.n_floats + hdr.n_ints) * 4
         self._shape = [getattr(hdr, f"n{i.lower()}") for i in hdr.sequence_order]
         self._struct = struct.Struct(f"{hdr.n_ints}i{len(ExtHeaderFrame._fields)}f")
@@ -328,7 +342,7 @@ class ExtHeader:
         f = self._struct.unpack_from(self.buffer, self._section_length * idx)
         return ExtHeaderFrame(*f[8:])
 
-    def _asdict(self):
+    def _asdict(self) -> dict:
         return {
             np.unravel_index(i, self._shape): self.frame(i)._asdict()
             for i in range(self.n_frames)
