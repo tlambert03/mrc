@@ -32,6 +32,7 @@ jobs:
 
       - name: Download Samples
         run: |
+          pip install dropbox
           python scripts/download_samples.py
 
       - name: Install dependencies
