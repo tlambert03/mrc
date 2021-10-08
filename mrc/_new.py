@@ -1,17 +1,22 @@
 import struct
 from pathlib import Path
-from typing import NamedTuple, Union
+from typing import NamedTuple, Optional, Union
 
 import numpy as np
 
 
 class DVFile:
+    ext_hdr: Optional["ExtHeader"]
+    hdr: "Header"
+
     def __init__(self, path: Union[str, Path]) -> None:
         with open(path, "rb") as fh:
             *r, self._title = _HDR.unpack(fh.read(_HDR.size))
             self.hdr = Header(*r)
-            buf = fh.read(self.hdr.ext_hdr_len)
-            self.ext_hdr = ExtHeader(buf, self.hdr)
+            if self.hdr.ext_hdr_len:
+                self.ext_hdr = ExtHeader(fh.read(self.hdr.ext_hdr_len), self.hdr)
+            else:
+                self.ext_hdr = None
 
         self.data: np.memmap = np.memmap(
             fh.name,
@@ -29,11 +34,10 @@ class DVFile:
     def to_xarray(self, squeeze=True):
         import xarray as xr
 
-        attrs = {
-            "header": self.hdr._asdict(),
-            "extended_header": self.ext_hdr._asdict(),
-        }
+        attrs = {"header": self.hdr._asdict()}
         attrs["header"].pop("blank")
+        if self.ext_hdr:
+            attrs["extended_header"] = self.ext_hdr._asdict()
         arr = xr.DataArray(
             np.asarray(self.data),
             dims=list(self.sizes),
@@ -53,11 +57,10 @@ class DVFile:
         for key, val in self.sizes.items():
             if key in ("XY"):
                 coords[key] = np.arange(val) * getattr(self.voxel_size, key.lower())
-            else:
+            elif self.ext_hdr:
                 stride = np.prod([self.sizes[ord[i]] for i in range(ord.index(key))])
                 f = [self.ext_hdr.frame(i * int(stride)) for i in range(val)]
                 coords[key] = [getattr(x, _map[key]) for x in f]
-
         return coords
 
     @property
@@ -195,6 +198,7 @@ class Header(NamedTuple):
     def image_type(self):
         return {
             0: "NORMAL",
+            100: "NORMAL",
             1: "TILT_SERIES",
             2: "STEREO_TILT_SERIES",
             3: "AVERAGED_IMAGES",
@@ -234,6 +238,7 @@ class ExtHeaderFrame(NamedTuple):
 class ExtHeader:
     def __init__(self, buf, hdr: Header) -> None:
         self.buffer = buf
+        self._hdr = hdr
         self.n_frames = hdr.n_sections
         self.n_floats = hdr.n_floats
         self._section_length = (hdr.n_floats + hdr.n_ints) * 4
