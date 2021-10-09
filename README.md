@@ -55,9 +55,8 @@ np.asarray(f)              # alternative to f.asarray()
 f.to_dask()                # delayed dask.array.Array
 f.to_xarray()              # in-memory xarray.DataArray, with labeled axes/coords
 f.to_xarray(delayed=True)  # delayed xarray.DataArray
-
-                # see below for examples of these structures
-# metadata      # returns instance of ...
+               
+# metadata     
 f.hdr           # Header as a named tuple
 f.ext_hdr       # (optional) extended header info
 f.voxel_size    # VoxelSize(x=0.65, y=0.65, z=1.0)
