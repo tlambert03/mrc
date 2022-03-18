@@ -67,7 +67,7 @@ class DVFile:
 
     def close(self) -> None:
         if not self.closed:
-            self.data._mmap.close()
+            self.data._mmap.close()  # type: ignore
             self._data = None
 
     @property
@@ -296,7 +296,7 @@ class Header(NamedTuple):
             0: "CTZ",
             1: "TZC",
             2: "TCZ",
-        }[self.img_seq]
+        }.get(self.img_seq, "CTZ")
 
     @property
     def nz(self) -> int:
