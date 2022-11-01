@@ -144,6 +144,8 @@ exclude_lines = [
     "@overload",
     "except ImportError",
 ]
+omit = ["src/mrc/mrc.py"]
+show_missing = true
 
 # https://github.com/cruft/cruft
 [tool.cruft]

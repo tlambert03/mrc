@@ -36,7 +36,7 @@ class DVFile:
         self._path = str(path)
         with open(path, "rb") as fh:
             self._byte_order = _byte_order(fh)
-            if self._byte_order is None:
+            if self._byte_order is None:  # pragma: no cover
                 raise ValueError(f"{path} is not a recognized DV file.")
             fh.seek(0)
             strct = LE_HDR if self._byte_order == "<" else BE_HDR
@@ -80,7 +80,7 @@ class DVFile:
 
     @property
     def data(self) -> np.memmap:
-        if self._data is None:
+        if self._data is None:  # pragma: no cover
             raise RuntimeError(
                 "Cannot read from closed file.  Please reopen with .open()"
             )
@@ -192,7 +192,7 @@ class DVFile:
         try:
             details = " (closed)" if self.closed else f" {self.dtype}: {self.sizes!r}"
             extra = f": {Path(self._path).name!r}{details}"
-        except Exception:
+        except Exception:  # pragma: no cover
             extra = ""
         return f"<ND2File at {hex(id(self))}{extra}>"
 
@@ -201,7 +201,7 @@ class DVFile:
         try:
             with open(path, "rb") as fh:
                 return _byte_order(fh) is not None
-        except Exception:
+        except Exception:  # pragma: no cover
             return False
 
 
@@ -217,7 +217,7 @@ def _byte_order(fh: BinaryIO) -> Optional[str]:
         return "<"
     if dvid == b"\xc0\xa0":
         return ">"
-    return None
+    return None  # pragma: no cover
 
 
 class Voxel(NamedTuple):
@@ -324,7 +324,7 @@ class Header(NamedTuple):
 
         try:
             return D[self.lens_num]["name"]
-        except KeyError:
+        except KeyError:  # pragma: no cover
             return ""
 
 
@@ -356,7 +356,7 @@ class ExtHeader:
         self._struct = struct.Struct(f"{hdr.n_ints}i{len(ExtHeaderFrame._fields)}f")
 
     def frame(self, idx: int) -> ExtHeaderFrame:
-        if idx >= self.n_frames:
+        if idx >= self.n_frames:  # pragma: no cover
             raise IndexError(f"index {idx} out of range for {self.n_frames} frames")
         f = self._struct.unpack_from(self.buffer, self._section_length * idx)
         return ExtHeaderFrame(*f[8:])
