@@ -1,5 +1,7 @@
-# -*- coding: utf-8 -*-
 """
+This is here mostly as an archive.  All new development happens in _new.py
+All file reading should go through the new API, but writing will still use this module.
+
 This file was extracted from the priithon library by Sebastian Haase
 https://github.com/sebhaase/priithon
 
@@ -13,9 +15,6 @@ but note that the Deltavision format is slightly different.
 Mrc class uses memory mapping (file size limit about 1GB (more or less)
 Mrc2 class section wise file/array I/O
 """
-__author__ = "Sebastian Haase"
-
-
 import os
 import weakref
 
@@ -115,11 +114,11 @@ class Mrc:
     def insertExtHdr(self, numInts, numFloats, nz=-1):
         """20051201 - test failed - data did NOT get shifted my next bytes !!!"""
         if numInts == numFloats == 0:
-            raise "what ??"
+            raise ValueError("what ??")
         if self.data_offset != 1024:
-            raise "what 2 ??"
+            raise ValueError("what 2 ??")
         if self.hdr.next != 0:
-            raise "what 3 ??"
+            raise ValueError("what 3 ??")
         if nz <= 0:
             nz = self.hdr.Num[-1]
         bytes = 4 * (numInts + numFloats) * nz
@@ -763,7 +762,7 @@ def dtype2MrcMode(dtype):
         return 6
     if dtype == np.int32:
         return 7
-    raise TypeError("MRC does not support %s (%s)" % (dtype.__name__, dtype))
+    raise TypeError(f"MRC does not support {dtype.__name__} ({dtype})")
 
 
 def shapeFromHdr(hdr, verbose=0):
@@ -822,7 +821,7 @@ def shapeFromHdr(hdr, verbose=0):
 
 # my hack to allow thinks like a.Mrc.hdr.d = (1,2,3)
 def implement_hdr(hdrArray):
-    class hdr(object):
+    class hdr:
         __slots__ = mrcHdrNames[:] + ["_array"]
 
         def __init__(s):
@@ -842,7 +841,7 @@ def implement_hdr(hdrArray):
             out = ""
             for field in mrcHdrNames:
                 if field != "_array":
-                    out += "{:12}{}\n".format(field, self.__getattr__(field))
+                    out += f"{field:12}{self.__getattr__(field)}\n"
             return out
 
         # depricated !!
@@ -1159,7 +1158,7 @@ mrcHdr_dtype = list(zip(mrcHdrNames, mrcHdrFormats))
 
 
 # Tifffile API
-def imsave(file, data, resolution=None, metadata={}, **kwargs):
+def imsave(file, data, resolution=None, metadata=None, **kwargs):
     """Write numpy array to mrc file
 
     This is a wrapper on the mrc.save() function, meant to mimic a subset of
@@ -1167,6 +1166,7 @@ def imsave(file, data, resolution=None, metadata={}, **kwargs):
         resolution : (float, float, float), or (float, float)
             X, Y, (and Z. if ndim==3) resolutions in microns per pixel.
     """
+    metadata = {} if metadata is None else metadata
     if resolution is not None:
         assert 2 <= len(resolution) <= 3, "resolution arg must be len 2 or 3"
         metadata["dx"] = resolution[0]
