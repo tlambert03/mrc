@@ -104,4 +104,5 @@ ENV/
 
 .vscode
 mrc/_version.py
+src/mrc/_version.py
 tests/data

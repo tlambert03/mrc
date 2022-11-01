@@ -20,8 +20,8 @@ import numpy as np
 if TYPE_CHECKING:
     from typing import Literal
 
-    import dask.array as da
-    import xarray as xr
+    import dask.array
+    import xarray
 
 __author__ = "Talley Lambert"
 __email__ = "talley.lambert@gmail.com"
@@ -49,11 +49,11 @@ class DVFile:
                 self.ext_hdr = None
         self.open()
 
-    def __enter__(self) -> "DVFile":
+    def __enter__(self) -> DVFile:
         self.open()
         return self
 
-    def __exit__(self, *a) -> None:
+    def __exit__(self, *a: Any) -> None:
         self.close()
 
     def open(self) -> None:
@@ -67,7 +67,7 @@ class DVFile:
 
     def close(self) -> None:
         if not self.closed:
-            self.data._mmap.close()  # type: ignore
+            self.data._mmap.close()
             self._data = None
 
     @property
@@ -89,20 +89,22 @@ class DVFile:
     def __array__(self) -> np.ndarray:
         return self.asarray()
 
-    def asarray(self, squeeze=True) -> np.ndarray:
+    def asarray(self, squeeze: bool = True) -> np.ndarray:
         return (self.data.squeeze() if squeeze else self.data).copy()
 
-    def to_dask(self) -> da.Array:
+    def to_dask(self) -> dask.array.Array:
         import dask.array as da
 
         chunks = [(1,) * v if k in "TZC" else (v,) for k, v in self.sizes.items()]
         return da.map_blocks(self._dask_block, chunks=chunks, dtype=self.dtype)
 
-    def _dask_block(self, block_id: Tuple[int]) -> np.ndarray:
+    def _dask_block(self, block_id: Tuple[int, ...]) -> np.ndarray:
         ncoords = 3
-        return self[block_id[:ncoords]][(np.newaxis,) * ncoords]
+        return self[block_id[:ncoords]][(np.newaxis,) * ncoords]  # type: ignore
 
-    def to_xarray(self, delayed=False, squeeze=True) -> "xr.DataArray":
+    def to_xarray(
+        self, delayed: bool = False, squeeze: bool = True
+    ) -> xarray.DataArray:
         import xarray as xr
 
         arr = xr.DataArray(
@@ -114,7 +116,7 @@ class DVFile:
         return arr.squeeze() if squeeze else arr
 
     def _expand_coords(self) -> Dict[str, Any]:
-        ord = self.hdr.sequence_order[::-1]
+        _ord = self.hdr.sequence_order[::-1]
         _map: Dict[str, Callable[[ExtHeaderFrame], str]] = {
             "C": lambda x: f"{x.exWavelen:.0f}/{x.emWavelen:.0f}",
             "T": lambda x: f"{x.timeStampSeconds}",
@@ -125,7 +127,7 @@ class DVFile:
             if key in ("XY"):
                 coords[key] = np.arange(val) * getattr(self.voxel_size, key.lower())
             elif self.ext_hdr:
-                stride = np.prod([self.sizes[ord[i]] for i in range(ord.index(key))])
+                stride = np.prod([self.sizes[_ord[i]] for i in range(_ord.index(key))])
                 f = [self.ext_hdr.frame(i * int(stride)) for i in range(val)]
                 coords[key] = [_map[key](x) for x in f]
         return coords
@@ -138,12 +140,12 @@ class DVFile:
     def ndim(self) -> int:
         return len(self.shape)
 
-    def __getitem__(self, key) -> np.ndarray:
+    def __getitem__(self, key: Union[int, slice]) -> np.ndarray:
         return self.data[key]
 
     @property
     def axes(self) -> str:
-        return self.hdr.sequence_order + "YX"
+        return f"{self.hdr.sequence_order}YX"
 
     @property
     def dtype(self) -> np.dtype:
@@ -195,7 +197,7 @@ class DVFile:
         return f"<ND2File at {hex(id(self))}{extra}>"
 
     @staticmethod
-    def is_supported_file(path) -> bool:
+    def is_supported_file(path: str) -> bool:
         try:
             with open(path, "rb") as fh:
                 return _byte_order(fh) is not None
@@ -204,8 +206,8 @@ class DVFile:
 
 
 HDR_FORMAT = "10i6f3i3f2i2hi24s4h6f6h2f2h3f6h3fi800s"
-LE_HDR = struct.Struct("<" + HDR_FORMAT)
-BE_HDR = struct.Struct(">" + HDR_FORMAT)
+LE_HDR = struct.Struct(f"<{HDR_FORMAT}")
+BE_HDR = struct.Struct(f">{HDR_FORMAT}")
 
 
 def _byte_order(fh: BinaryIO) -> Optional[str]:
@@ -376,16 +378,33 @@ def imread(
 
 
 @overload
-def imread(file: str, dask: bool = ..., xarray: Literal[True] = True) -> xr.DataArray:
+def imread(
+    file: str, dask: bool = ..., xarray: Literal[True] = True
+) -> xarray.DataArray:
     ...
 
 
 @overload
-def imread(file: str, dask: Literal[True] = ..., xarray=False) -> da.Array:
+def imread(
+    file: str, dask: bool = ..., xarray: Literal[False] = False
+) -> dask.array.Array:
     ...
 
 
-def imread(file: str, dask: bool = False, xarray: bool = False):
+def imread(
+    file: str, dask: bool = False, xarray: bool = False
+) -> Union[np.ndarray, xarray.DataArray, dask.array.Array]:
+    """Read a MRC file to a numpy/dask/xarray array.
+
+    Parameters
+    ----------
+    file : str
+        Path to the MRC file.
+    dask : bool, optional
+        If True, return a dask-backed array, by default False
+    xarray : bool, optional
+        If True, return an xarray DataArray, by default False
+    """
     with DVFile(file) as dvf:
         if xarray:
             return dvf.to_xarray(delayed=dask)
