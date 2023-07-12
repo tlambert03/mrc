@@ -549,7 +549,6 @@ class Mrc2:
             self._secByteSize = 0
 
     def initHdrForArr(self, arr, zAxisOrder=None):
-
         if zAxisOrder is None:
             zAxisOrder = pick_zAxisOrder(arr)
         else:

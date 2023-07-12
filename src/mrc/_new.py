@@ -7,11 +7,7 @@ from typing import (
     Any,
     BinaryIO,
     Callable,
-    Dict,
     NamedTuple,
-    Optional,
-    Tuple,
-    Union,
     overload,
 )
 
@@ -28,11 +24,11 @@ __email__ = "talley.lambert@gmail.com"
 
 
 class DVFile:
-    ext_hdr: Optional[ExtHeader]
+    ext_hdr: ExtHeader | None
     hdr: Header
-    _data: Optional[np.memmap] = None
+    _data: np.memmap | None = None
 
-    def __init__(self, path: Union[str, Path]) -> None:
+    def __init__(self, path: str | Path) -> None:
         self._path = str(path)
         with open(path, "rb") as fh:
             self._byte_order = _byte_order(fh)
@@ -98,7 +94,7 @@ class DVFile:
         chunks = [(1,) * v if k in "TZC" else (v,) for k, v in self.sizes.items()]
         return da.map_blocks(self._dask_block, chunks=chunks, dtype=self.dtype)
 
-    def _dask_block(self, block_id: Tuple[int, ...]) -> np.ndarray:
+    def _dask_block(self, block_id: tuple[int, ...]) -> np.ndarray:
         ncoords = 3
         return self[block_id[:ncoords]][(np.newaxis,) * ncoords]  # type: ignore
 
@@ -115,9 +111,9 @@ class DVFile:
         )
         return arr.squeeze() if squeeze else arr
 
-    def _expand_coords(self) -> Dict[str, Any]:
+    def _expand_coords(self) -> dict[str, Any]:
         _ord = self.hdr.sequence_order[::-1]
-        _map: Dict[str, Callable[[ExtHeaderFrame], str]] = {
+        _map: dict[str, Callable[[ExtHeaderFrame], str]] = {
             "C": lambda x: f"{x.exWavelen:.0f}/{x.emWavelen:.0f}",
             "T": lambda x: f"{x.timeStampSeconds}",
             "Z": lambda x: f"{x.stageZCoord}",
@@ -133,14 +129,14 @@ class DVFile:
         return coords
 
     @property
-    def shape(self) -> Tuple[int, ...]:
+    def shape(self) -> tuple[int, ...]:
         return tuple(self.sizes.values())
 
     @property
     def ndim(self) -> int:
         return len(self.shape)
 
-    def __getitem__(self, key: Union[int, slice]) -> np.ndarray:
+    def __getitem__(self, key: int | slice) -> np.ndarray:
         return self.data[key]
 
     @property
@@ -162,7 +158,7 @@ class DVFile:
         return np.dtype(char)
 
     @property
-    def sizes(self) -> Dict[str, int]:
+    def sizes(self) -> dict[str, int]:
         d = {
             "T": self.hdr.nt,
             "C": self.hdr.nc,
@@ -210,7 +206,7 @@ LE_HDR = struct.Struct(f"<{HDR_FORMAT}")
 BE_HDR = struct.Struct(f">{HDR_FORMAT}")
 
 
-def _byte_order(fh: BinaryIO) -> Optional[str]:
+def _byte_order(fh: BinaryIO) -> str | None:
     fh.seek(24 * 4)
     dvid = fh.read(2)
     if dvid == b"\xa0\xc0":
@@ -393,7 +389,7 @@ def imread(
 
 def imread(
     file: str, dask: bool = False, xarray: bool = False
-) -> Union[np.ndarray, xarray.DataArray, dask.array.Array]:
+) -> np.ndarray | xarray.DataArray | dask.array.Array:
     """Read a MRC file to a numpy/dask/xarray array.
 
     Parameters

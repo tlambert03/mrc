@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Dict, TypedDict
+    from typing import TypedDict
 
     class LensDict(TypedDict, total=False):
+        """Lens parameters."""
+
         name: str
         lensNA: float
         magnification: float
@@ -16,7 +18,7 @@ if TYPE_CHECKING:
         manufacturer: str
 
 
-D: Dict[int, LensDict] = {
+D: dict[int, LensDict] = {
     10100: {
         "name": "Olympus 10X/0.30, S Plan Achromat, phase, IMT2",
         "lensNA": 0.30,
