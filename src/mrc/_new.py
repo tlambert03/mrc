@@ -59,6 +59,7 @@ class DVFile:
                 self.dtype,
                 offset=LE_HDR.size + self.hdr.ext_hdr_len,
                 shape=self.shape,
+                mode="r",
             )
 
     def close(self) -> None:
