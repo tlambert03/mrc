@@ -370,22 +370,19 @@ class ExtHeader:
 @overload
 def imread(
     file: str, dask: Literal[False] = False, xarray: Literal[False] = False
-) -> np.ndarray:
-    ...
+) -> np.ndarray: ...
 
 
 @overload
 def imread(
     file: str, dask: bool = ..., xarray: Literal[True] = True
-) -> xarray.DataArray:
-    ...
+) -> xarray.DataArray: ...
 
 
 @overload
 def imread(
     file: str, dask: bool = ..., xarray: Literal[False] = False
-) -> dask.array.Array:
-    ...
+) -> dask.array.Array: ...
 
 
 def imread(
