@@ -15,6 +15,7 @@ but note that the Deltavision format is slightly different.
 Mrc class uses memory mapping (file size limit about 1GB (more or less)
 Mrc2 class section wise file/array I/O
 """
+
 import os
 import weakref
 
