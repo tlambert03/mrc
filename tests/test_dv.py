@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 import psutil
 import pytest
+
 from mrc import DVFile, imread
 
 DATA = Path(__file__).parent / "data"
