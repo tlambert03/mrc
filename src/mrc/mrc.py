@@ -628,7 +628,7 @@ class Mrc2:
         self._shape = (nsecs, ny, nx)  # todo: wavelenths , times
         self._shape2d = self._shape[-2:]
         self._dtype = MrcMode2dtype(self.hdr.PixelType)
-        self._secByteSize = np.nbytes[self._dtype] * np.prod(self._shape2d)
+        self._secByteSize = np.dtype(self._dtype).itemsize * np.prod(self._shape2d)
 
     def setHdrForShapeType(self, shape, type):
         # not used by anything at the moment
