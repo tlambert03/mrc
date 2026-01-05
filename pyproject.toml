@@ -44,9 +44,9 @@ dependencies = [
 test = [
     "pytest-cov>=7",
     "pytest>=8",
-    "dask>=2023",
+    "dask>=2024",
     "psutil>=5.9.8",
-    "xarray>=2023",
+    "xarray>=2024",
 ]
 dev = [
     { include-group = "test" },

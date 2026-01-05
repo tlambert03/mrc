@@ -63,7 +63,8 @@ class Mrc:
         self.hdr = makeHdrArray(self.h)
         nzBeforeByteOrder = self.hdr.Num[0]
         if nzBeforeByteOrder < 0 or nzBeforeByteOrder > 10000:
-            self.hdr._array.dtype = self.hdr._array.dtype.newbyteorder()
+            new_dtype = self.hdr._array.dtype.newbyteorder()
+            self.hdr._array = self.hdr._array.view(dtype=new_dtype)
             self.isByteSwapped = True
         else:
             self.isByteSwapped = False
@@ -819,8 +820,11 @@ def shapeFromHdr(hdr, verbose=0):
     return shape
 
 
-# my hack to allow thinks like a.Mrc.hdr.d = (1,2,3)
+# my hack to allow things like a.Mrc.hdr.d = (1,2,3)
 def implement_hdr(hdrArray):
+    # Use mutable container to allow byte-order swapping via view()
+    _arr = [hdrArray]
+
     class hdr:
         __slots__ = mrcHdrNames[:] + ["_array"]
 
@@ -828,14 +832,17 @@ def implement_hdr(hdrArray):
             pass
 
         def __setattr__(s, n, v):
-            # 20070131 hdrArray.field(n)[0] = v
-            hdrArray[n][0] = v
+            if n == "_array":
+                _arr[0] = v
+            else:
+                # 20070131 hdrArray.field(n)[0] = v
+                _arr[0][n][0] = v
 
         def __getattr__(s, n):
             if n == "_array":
-                return hdrArray  # 20060818
+                return _arr[0]  # 20060818
             # 20070131 return hdrArray.field(n)[0]
-            return hdrArray[n][0]
+            return _arr[0][n][0]
 
         def __str__(self):
             out = ""
@@ -856,10 +863,7 @@ def makeHdrArray(buffer=None):
     if buffer is not None:
         # 20070131  h = buffer.view()
         # 20060131  h.__class__ = np.recarray
-        h = buffer
-        h.dtype = mrcHdr_dtype
-
-        h = weakref.proxy(h)  # 20070131   CHECK if this works
+        h = buffer.view(dtype=mrcHdr_dtype)
     else:
         h = np.recarray(1, mrcHdr_dtype)
     # 20060818 return h
@@ -1142,7 +1146,7 @@ mrcHdrFields = [
         "(z,x,y) origin, in um.",
     ),  # 20050920  ## fixed: order is z,x,y NOT x,y,z
     ("i4", "NumTitles", "Number of titles. Valid numbers are between 0 and 10."),
-    ("10a80", "title", "Title 1. 80 characters long."),
+    ("10S80", "title", "Title 1. 80 characters long."),
 ]
 mrcHdrNames = []
 mrcHdrFormats = []
