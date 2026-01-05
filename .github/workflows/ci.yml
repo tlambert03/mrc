@@ -22,9 +22,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, ubuntu-latest]
         python-version: ["3.9", "3.11", "3.13", "3.14"]
         resolution: ["lowest-direct", "highest"]
+        include:
+          - os: macos-latest
+            python-version: "3.9"
+            resolution: "highest"
+          - os: macos-latest
+            python-version: "3.14"
+            resolution: "highest"
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
