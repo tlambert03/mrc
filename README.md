@@ -94,7 +94,7 @@ arr.Mrc.info()
 print(arr.Mrc.header)
 # dv files may have additional info in the extended header:
 arr.Mrc.extended_header
-# for instsance, timestamps for each channel at each timepoint:
+# for instance, timestamps for each channel at each timepoint:
 arr.Mrc.extended_header['timeStampSeconds']
 
 # or you can write a numpy array to DV format
@@ -114,7 +114,7 @@ mrc.imsave("/path/to/output.dv", arr,
 *this information is archived from the no-longer-existing page at
 http://www.msg.ucsf.edu/IVE/IVE4_HTML/priism_mrc_header.html*
 
-The MRC header is 1024 bytes layed out as described below. Each field
+The MRC header is 1024 bytes laid out as described below. Each field
 is in one of these formats:
 
 `n` Is a 2-byte signed integer (NPY_INT16)

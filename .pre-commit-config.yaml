@@ -4,32 +4,36 @@ ci:
   autoupdate_commit_msg: "ci(pre-commit.ci): autoupdate"
 
 repos:
-
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       - id: check-docstring-first
       - id: end-of-file-fixer
       - id: trailing-whitespace
 
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.16
+    rev: v0.24.1
     hooks:
       - id: validate-pyproject
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.3.5
+  - repo: https://github.com/adhtruong/mirrors-typos
+    rev: v1.41.0
     hooks:
-      - id: ruff
-        args: [--fix]
+      - id: typos
+        exclude: src/mrc/mrc.py
+        args: [--force-exclude]  # omit --write-changes
 
-  - repo: https://github.com/psf/black
-    rev: 24.3.0
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.10
     hooks:
-      - id: black
+      - id: ruff-check
+      - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.9.0
+    rev: v1.19.1
     hooks:
       - id: mypy
         files: "^src/"
+        exclude: scripts
+        additional_dependencies:
+          - numpy

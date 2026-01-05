@@ -64,7 +64,7 @@ class DVFile:
 
     def close(self) -> None:
         if not self.closed:
-            self.data._mmap.close()
+            self.data._mmap.close()  # type: ignore
             self._data = None
 
     @property
