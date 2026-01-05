@@ -1,3 +1,9 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "dropbox>=12.0.2",
+# ]
+# ///
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
