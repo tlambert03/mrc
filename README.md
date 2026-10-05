@@ -34,38 +34,38 @@ reader going forward.  It does not write files (see the legacy API for that).
 from mrc import DVFile, imread
 import numpy as np
 
-my_array = imread('some_file.dv')                          # read to numpy array
-my_array = imread('some_file.dv', dask=True)               # read to dask array
-my_array = imread('some_file.dv', xarray=True)             # read to xarray
-my_array = imread('some_file.dv', xarray=True, dask=True)  # read to dask-xarray
+my_array = imread("some_file.dv")  # read to numpy array
+my_array = imread("some_file.dv", dask=True)  # read to dask array
+my_array = imread("some_file.dv", xarray=True)  # read to xarray
+my_array = imread("some_file.dv", xarray=True, dask=True)  # read to dask-xarray
 
 # or open a file with DVFile
-f = DVFile('some_file.dv')
+f = DVFile("some_file.dv")
 
 # attributes:   # example output
-f.path          # 'some_file.dv'
-f.shape         # (10, 2, 256, 256)
-f.ndim          # 4
-f.dtype         # np.dtype('uint16')
-f.sizes         # {'T': 10, 'C': 2, 'Y': 256, 'X': 256}
+f.path  # 'some_file.dv'
+f.shape  # (10, 2, 256, 256)
+f.ndim  # 4
+f.dtype  # np.dtype('uint16')
+f.sizes  # {'T': 10, 'C': 2, 'Y': 256, 'X': 256}
 
 # array output
-f.asarray()                # in-memory np.ndarray
-np.asarray(f)              # alternative to f.asarray()
-f.to_dask()                # delayed dask.array.Array
-f.to_xarray()              # in-memory xarray.DataArray, with labeled axes/coords
+f.asarray()  # in-memory np.ndarray
+np.asarray(f)  # alternative to f.asarray()
+f.to_dask()  # delayed dask.array.Array
+f.to_xarray()  # in-memory xarray.DataArray, with labeled axes/coords
 f.to_xarray(delayed=True)  # delayed xarray.DataArray
 
 # metadata
-f.hdr           # Header as a named tuple
-f.ext_hdr       # (optional) extended header info
-f.voxel_size    # VoxelSize(x=0.65, y=0.65, z=1.0)
+f.hdr  # Header as a named tuple
+f.ext_hdr  # (optional) extended header info
+f.voxel_size  # VoxelSize(x=0.65, y=0.65, z=1.0)
 
-f.close()       # don't forget to close when done!
-f.closed        # boolean, whether the file is closed
+f.close()  # don't forget to close when done!
+f.closed  # boolean, whether the file is closed
 
 # ... or you can use it as a context manager
-with DVFile('some_file.dv') as dvf:
+with DVFile("some_file.dv") as dvf:
     xarr = dvf.to_xarray()
 ```
 
@@ -83,7 +83,7 @@ import mrc
 import numpy as np
 
 # Read a dv file
-arr = mrc.imread('/path/to/file.dv')
+arr = mrc.imread("/path/to/file.dv")
 # just a numpy array with the data...
 isinstance(arr, np.ndarray)  # True
 
@@ -95,17 +95,14 @@ print(arr.Mrc.header)
 # dv files may have additional info in the extended header:
 arr.Mrc.extended_header
 # for instance, timestamps for each channel at each timepoint:
-arr.Mrc.extended_header['timeStampSeconds']
+arr.Mrc.extended_header["timeStampSeconds"]
 
 # or you can write a numpy array to DV format
-arr = np.random.rand(23,3,256,256).astype('single')
-mrc.imsave("/path/to/output.dv", arr,
-    metadata={
-        'dx': 0.08,
-        'dy': 0.08,
-        'dz': 0.125,
-        'wave': [445, 528, 615, 0, 0]
-    }
+arr = np.random.rand(23, 3, 256, 256).astype("single")
+mrc.imsave(
+    "/path/to/output.dv",
+    arr,
+    metadata={"dx": 0.08, "dy": 0.08, "dz": 0.125, "wave": [445, 528, 615, 0, 0]},
 )
 ```
 
